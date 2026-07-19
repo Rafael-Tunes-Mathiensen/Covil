@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { useSession } from './features/auth/useSession'
@@ -97,6 +97,17 @@ function ConnectedWorkspace({ user }: { user: User }) {
       onSendMessage={workspace.sendMessage}
       onRefreshInvite={workspace.refreshInvite}
       onRotateInvite={workspace.rotateInvite}
+      currentPermissions={workspace.currentPermissions}
+      roles={workspace.roles}
+      memberRoleAssignments={workspace.memberRoleAssignments}
+      voiceModerationStates={workspace.voiceModerationStates}
+      isSubmitting={workspace.isSubmitting}
+      onCreateChannel={workspace.createChannel}
+      onCreateRole={workspace.createRole}
+      onDeleteRole={workspace.deleteRole}
+      onSetMemberRole={workspace.setMemberRole}
+      onRemoveMember={workspace.removeMember}
+      onModerateVoice={workspace.moderateVoice}
       selectedChannel={workspace.selectedChannel}
       user={user}
       voiceChannel={voiceChannel}
@@ -117,6 +128,17 @@ interface ConnectedWorkspaceReadyProps {
   onSendMessage: (content: string) => Promise<void>
   onRefreshInvite: () => Promise<string>
   onRotateInvite: () => Promise<string>
+  currentPermissions: ReturnType<typeof useCovilWorkspace>['currentPermissions']
+  roles: ReturnType<typeof useCovilWorkspace>['roles']
+  memberRoleAssignments: ReturnType<typeof useCovilWorkspace>['memberRoleAssignments']
+  voiceModerationStates: ReturnType<typeof useCovilWorkspace>['voiceModerationStates']
+  isSubmitting: boolean
+  onCreateChannel: ReturnType<typeof useCovilWorkspace>['createChannel']
+  onCreateRole: ReturnType<typeof useCovilWorkspace>['createRole']
+  onDeleteRole: ReturnType<typeof useCovilWorkspace>['deleteRole']
+  onSetMemberRole: ReturnType<typeof useCovilWorkspace>['setMemberRole']
+  onRemoveMember: ReturnType<typeof useCovilWorkspace>['removeMember']
+  onModerateVoice: ReturnType<typeof useCovilWorkspace>['moderateVoice']
 }
 
 function ConnectedWorkspaceReady({
@@ -132,15 +154,55 @@ function ConnectedWorkspaceReady({
   onSendMessage,
   onRefreshInvite,
   onRotateInvite,
+  currentPermissions,
+  roles,
+  memberRoleAssignments,
+  voiceModerationStates,
+  isSubmitting,
+  onCreateChannel,
+  onCreateRole,
+  onDeleteRole,
+  onSetMemberRole,
+  onRemoveMember,
+  onModerateVoice,
 }: ConnectedWorkspaceReadyProps) {
+  const [activeVoiceChannelId, setActiveVoiceChannelId] = useState(voiceChannel.id)
+  const activeVoiceChannel =
+    channels.find(({ id, kind }) => id === activeVoiceChannelId && kind === 'voice') ?? voiceChannel
   const transport = useMemo(() => new SupabaseVoiceTransport(supabase!, user.id), [user.id])
   const voice = useVoiceRoom({
-    roomId: voiceChannel.id,
+    roomId: activeVoiceChannel.id,
     participant: { id: currentUser.id, displayName: currentUser.displayName },
     transport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
   })
   const admin = useAdminConsole(supabase!)
+  const setServerMuted = voice.setServerMuted
+  const leaveVoice = voice.leave
+  const voiceStatus = voice.status
+  const handledDisconnectRef = useRef<string | null>(null)
+  const currentModeration = voiceModerationStates.find(
+    ({ channelId, userId }) => channelId === activeVoiceChannel.id && userId === currentUser.id,
+  )
+
+  useEffect(() => {
+    setServerMuted(currentModeration?.serverMuted ?? false)
+  }, [currentModeration?.serverMuted, setServerMuted])
+
+  useEffect(() => {
+    const requestedAt = currentModeration?.disconnectRequestedAt
+    if (!requestedAt || voiceStatus !== 'joined' || handledDisconnectRef.current === requestedAt) return
+    handledDisconnectRef.current = requestedAt
+    const age = Date.now() - new Date(requestedAt).getTime()
+    if (age >= 0 && age < 15_000) void leaveVoice()
+  }, [currentModeration?.disconnectRequestedAt, leaveVoice, voiceStatus])
+
+  async function selectChannel(channel: Channel) {
+    onSelectChannel(channel)
+    if (channel.kind !== 'voice' || channel.id === activeVoiceChannel.id) return
+    if (voice.status !== 'idle') await voice.leave()
+    setActiveVoiceChannelId(channel.id)
+  }
 
   return (
     <WorkspaceView
@@ -148,16 +210,27 @@ function ConnectedWorkspaceReady({
       covil={covil}
       currentUser={currentUser}
       isDemo={false}
+      currentPermissions={currentPermissions}
+      roles={roles}
+      memberRoleAssignments={memberRoleAssignments}
+      voiceModerationStates={voiceModerationStates}
+      isSubmitting={isSubmitting}
       members={members}
       messages={messages}
-      onSelectChannel={onSelectChannel}
+      onSelectChannel={(channel) => void selectChannel(channel)}
       onSendMessage={onSendMessage}
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
+      onCreateChannel={onCreateChannel}
+      onCreateRole={onCreateRole}
+      onDeleteRole={onDeleteRole}
+      onSetMemberRole={onSetMemberRole}
+      onRemoveMember={onRemoveMember}
+      onModerateVoice={onModerateVoice}
       onSignOut={() => void supabase!.auth.signOut()}
       selectedChannel={selectedChannel}
       voice={voice}
-      voiceChannel={voiceChannel}
+      voiceChannel={activeVoiceChannel}
       admin={admin}
     />
   )

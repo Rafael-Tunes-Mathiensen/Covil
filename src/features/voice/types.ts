@@ -132,11 +132,14 @@ export interface UseVoiceRoomResult {
   localStream: MediaStream | null
   localScreenStream: MediaStream | null
   isMuted: boolean
+  isServerMuted: boolean
   isScreenSharing: boolean
+  speakingParticipantIds: ReadonlySet<string>
   diagnostics: VoiceDiagnostics
   join: () => Promise<void>
   leave: () => Promise<void>
   setMuted: (muted: boolean) => void
+  setServerMuted: (muted: boolean) => void
   toggleMute: () => void
   startScreenShare: () => Promise<void>
   stopScreenShare: () => Promise<void>

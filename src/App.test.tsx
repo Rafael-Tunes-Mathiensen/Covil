@@ -6,7 +6,7 @@ describe('App em modo de demonstração', () => {
   it('permite navegar até a sala de voz sem pedir o microfone automaticamente', () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Lobby' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sala de voz Lobby' }))
 
     expect(
       screen.getByRole('heading', { name: 'O Lobby está esperando.' }),

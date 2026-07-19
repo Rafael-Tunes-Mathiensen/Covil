@@ -16,7 +16,7 @@ function serializeConfig(env: Env) {
 }
 
 export default {
-  fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: Env) {
     const url = new URL(request.url)
 
     if (url.pathname === '/config.js') {
@@ -29,6 +29,12 @@ export default {
       })
     }
 
-    return env.ASSETS.fetch(request)
+    const response = await env.ASSETS.fetch(request)
+    if (!response.headers.get('Content-Type')?.includes('text/html')) return response
+
+    const headers = new Headers(response.headers)
+    headers.set('Cache-Control', 'no-cache')
+    const html = (await response.text()).replaceAll('__COVIL_ORIGIN__', url.origin)
+    return new Response(html, { status: response.status, statusText: response.statusText, headers })
   },
 }

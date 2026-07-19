@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 import { useCovilWorkspace } from './useCovilWorkspace'
@@ -7,10 +7,27 @@ const memberId = 'member-user-id'
 const covilId = 'covil-id'
 
 interface FakeWorkspaceState {
+  currentRole: 'owner' | 'member'
   channels: Array<{ id: string; covil_id: string; name: string; kind: 'text' | 'voice'; position: number }>
   members: Array<{ user_id: string; role: 'owner' | 'member' }>
   messages: Array<{ id: string; channel_id: string; author_id: string; content: string; created_at: string }>
   profiles: Array<{ id: string; display_name: string }>
+  roles: Array<{
+    id: string
+    covil_id: string
+    name: string
+    color: string
+    permissions: Array<'manage_channels' | 'moderate_voice' | 'remove_members'>
+    position: number
+  }>
+  assignments: Array<{ covil_id: string; user_id: string; role_id: string }>
+  moderation: Array<{
+    channel_id: string
+    user_id: string
+    server_muted: boolean
+    disconnect_requested_at: string | null
+    updated_at: string
+  }>
 }
 
 class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
@@ -59,7 +76,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
     if (this.table === 'covil_members' && this.columns === 'covil_id, role') {
       const isCurrentMember = this.filters.get('user_id') === memberId
       return {
-        data: [{ covil_id: covilId, role: isCurrentMember ? 'member' : 'owner' }],
+        data: [{ covil_id: covilId, role: isCurrentMember ? this.state.currentRole : 'owner' }],
         error: null,
       }
     }
@@ -71,6 +88,9 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
     if (this.table === 'channels') return { data: this.state.channels, error: null }
     if (this.table === 'profiles') return { data: this.state.profiles, error: null }
     if (this.table === 'messages') return { data: this.state.messages, error: null }
+    if (this.table === 'covil_roles') return { data: this.state.roles, error: null }
+    if (this.table === 'covil_member_roles') return { data: this.state.assignments, error: null }
+    if (this.table === 'voice_moderation_states') return { data: this.state.moderation, error: null }
 
     return { data: [], error: null }
   }
@@ -78,16 +98,23 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
 
 function createFakeClient(overrides: Partial<FakeWorkspaceState> = {}) {
   const state: FakeWorkspaceState = {
+    currentRole: 'member',
     channels: [],
     members: [{ user_id: memberId, role: 'member' }],
     messages: [],
     profiles: [{ id: memberId, display_name: 'Amigo' }],
+    roles: [],
+    assignments: [],
+    moderation: [],
     ...overrides,
   }
   const listeners = new Map<string, Set<() => void>>()
   const rpc = vi.fn(async (name: string) => ({
-    data: null,
-    error: name === 'get_covil_invite' ? new Error('Somente o owner pode consultar o convite.') : null,
+    data: name === 'get_covil_invite' && state.currentRole === 'owner' ? 'INVITE-CODE' : null,
+    error:
+      name === 'get_covil_invite' && state.currentRole !== 'owner'
+        ? new Error('Somente o owner pode consultar o convite.')
+        : null,
   }))
   const channel = vi.fn(() => {
     const realtimeChannel = {
@@ -216,6 +243,42 @@ describe('useCovilWorkspace', () => {
 
     await waitFor(() => {
       expect(result.current.messages.map(({ content }) => content)).toContain('Chegou sem recarregar.')
+    })
+  })
+
+  it('combina cargos atribuídos nas permissões efetivas do usuário', async () => {
+    const fake = createFakeClient({
+      roles: [
+        {
+          id: 'guardian-role',
+          covil_id: covilId,
+          name: 'Guardião',
+          color: '#7a8cff',
+          permissions: ['moderate_voice', 'remove_members'],
+          position: 0,
+        },
+      ],
+      assignments: [{ covil_id: covilId, user_id: memberId, role_id: 'guardian-role' }],
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(result.current.currentPermissions).toEqual(['moderate_voice', 'remove_members'])
+    expect(result.current.roles[0]?.name).toBe('Guardião')
+  })
+
+  it('cria canais pelo RPC autorizado e recarrega o workspace', async () => {
+    const fake = createFakeClient({ currentRole: 'owner' })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await act(() => result.current.createChannel('estratégia', 'text'))
+
+    expect(fake.rpc).toHaveBeenCalledWith('create_covil_channel', {
+      p_covil_id: covilId,
+      p_kind: 'text',
+      p_name: 'estratégia',
     })
   })
 })

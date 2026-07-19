@@ -23,10 +23,30 @@ export function ChatPanel({
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const knownChannelRef = useRef<string | null>(null)
+  const knownMessageIdsRef = useRef<Set<string>>(new Set())
+  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    endRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (knownChannelRef.current !== channel.id) {
+      knownChannelRef.current = channel.id
+      knownMessageIdsRef.current = new Set(messages.map(({ id }) => id))
+      setNewMessageIds(new Set())
+      return
+    }
+
+    const added = messages.filter(({ id }) => !knownMessageIdsRef.current.has(id)).map(({ id }) => id)
+    for (const { id } of messages) knownMessageIdsRef.current.add(id)
+    if (added.length === 0) return
+    setNewMessageIds(new Set(added))
+    const timeout = window.setTimeout(() => setNewMessageIds(new Set()), 450)
+    return () => window.clearTimeout(timeout)
+  }, [channel.id, messages])
 
   async function submit() {
     const message = normalizeMessage(draft)
@@ -87,7 +107,7 @@ export function ChatPanel({
             new Date(message.createdAt).getTime() - new Date(previous.createdAt).getTime() < 5 * 60_000
 
           return (
-            <article className={`message${isGrouped ? ' message--grouped' : ''}`} key={message.id}>
+            <article className={`message${isGrouped ? ' message--grouped' : ''}${newMessageIds.has(message.id) ? ' message--new' : ''}`} key={message.id}>
               {!isGrouped && (
                 <Avatar
                   color={message.author.avatarColor}

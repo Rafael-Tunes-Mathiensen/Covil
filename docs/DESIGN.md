@@ -6,17 +6,36 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 
 ## Plano de conteúdo
 
-1. **Navegação:** nome do Covil, canais de texto e a sala de voz.
+1. **Navegação:** nome do Covil, canais de texto, salas de voz e ações autorizadas.
 2. **Área principal:** conversa ou compartilhamento de tela, nunca os dois disputando atenção.
 3. **Contexto:** participantes e estado de voz em um painel recolhível.
 4. **Ação persistente:** controles essenciais da chamada em uma barra inferior.
+5. **Administração:** criação de canais, cargos e atribuições em diálogos focados.
 
 ## Tese de interação
 
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
-- O contorno do avatar responde suavemente à voz, sem animações contínuas decorativas.
+- O contorno do avatar e uma pequena forma de onda respondem somente enquanto o detector local identifica fala.
 - O compartilhamento de tela expande a área principal e recolhe o contexto secundário.
-- Estados de hover deslocam ícones e superfícies por poucos pixels para reforçar a ação.
+- Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.
+- Ícones ativos, botões e estados de hover usam escala ou deslocamento mínimo para confirmar a ação.
+
+## Movimento, som e acessibilidade
+
+As durações usam tokens entre 140 e 420 ms e uma curva de desaceleração comum.
+Animações contínuas ficam restritas a estados vivos, como conexão, carregamento e
+fala. `prefers-reduced-motion: reduce` reduz animações, transições e rolagem
+suave a uma mudança praticamente instantânea.
+
+Os efeitos de entrada, saída, mute, mensagem e compartilhamento são tons curtos
+sintetizados com Web Audio, sem arquivos de áudio externos. A preferência de
+liga/desliga fica somente no `localStorage` do navegador e pode ser alterada na
+barra do usuário.
+
+Diálogos usam `role="dialog"`, título associado, foco inicial, contenção de Tab,
+fechamento por Escape e restauração do foco. Botões apenas com ícone têm nomes
+acessíveis, seleções expõem `aria-pressed` ou `aria-selected` e erros usam regiões
+de alerta.
 
 ## Sistema visual
 

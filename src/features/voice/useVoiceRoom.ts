@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getNegotiationDecision, isPolitePeer } from './negotiation'
+import { createSpeakingDetector, type SpeakingDetector } from './speakingDetection'
 import type {
   RemoteVoicePeer,
   SignalUnsubscribe,
@@ -27,6 +28,9 @@ const DEFAULT_SCREEN_SHARE_CONSTRAINTS: DisplayMediaStreamOptions = {
     width: { ideal: 1280 },
   },
 }
+
+const SPEAKING_SAMPLE_INTERVAL_MS = 100
+const SPEAKING_ANALYSER_FFT_SIZE = 256
 
 type ErrorContext =
   | 'microphone'
@@ -58,6 +62,21 @@ interface PeerContext {
   } | null
 }
 
+interface SpeakingMonitor {
+  analyser: AnalyserNode
+  detector: SpeakingDetector
+  samples: Float32Array<ArrayBuffer>
+  source: MediaStreamAudioSourceNode
+  stream: MediaStream
+}
+
+interface SpeakingActivity {
+  context: AudioContext
+  intervalId: number
+  monitors: Map<string, SpeakingMonitor>
+  speakingParticipantIds: Set<string>
+}
+
 interface ActiveSession {
   generation: number
   roomId: string
@@ -70,11 +89,13 @@ interface ActiveSession {
   screenRequestVersion: number
   participants: Map<string, VoiceParticipant>
   peers: Map<string, PeerContext>
+  speakingActivity: SpeakingActivity | null
   unsubscribers: SignalUnsubscribe[]
   disposed: boolean
   reportError: (error: VoiceRoomError) => void
   publishParticipants: () => void
   publishPeers: () => void
+  publishSpeakingParticipants: () => void
   publishLocalScreen: (stream: MediaStream | null) => void
 }
 
@@ -294,6 +315,172 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop())
 }
 
+function getAudioContextConstructor() {
+  if (typeof window === 'undefined') return undefined
+
+  const contextWindow = window as typeof window & {
+    webkitAudioContext?: typeof AudioContext
+  }
+  return contextWindow.AudioContext ?? contextWindow.webkitAudioContext
+}
+
+function setParticipantSpeaking(
+  session: ActiveSession,
+  participantId: string,
+  speaking: boolean,
+) {
+  const activity = session.speakingActivity
+  if (!activity) return
+
+  const wasSpeaking = activity.speakingParticipantIds.has(participantId)
+  if (speaking === wasSpeaking) return
+
+  if (speaking) {
+    activity.speakingParticipantIds.add(participantId)
+  } else {
+    activity.speakingParticipantIds.delete(participantId)
+  }
+  session.publishSpeakingParticipants()
+}
+
+function resetSpeakingMonitor(session: ActiveSession, participantId: string) {
+  const monitor = session.speakingActivity?.monitors.get(participantId)
+  monitor?.detector.reset()
+  setParticipantSpeaking(session, participantId, false)
+}
+
+function removeSpeakingMonitor(session: ActiveSession, participantId: string) {
+  const activity = session.speakingActivity
+  const monitor = activity?.monitors.get(participantId)
+  if (!activity || !monitor) {
+    setParticipantSpeaking(session, participantId, false)
+    return
+  }
+
+  activity.monitors.delete(participantId)
+  monitor.detector.reset()
+  try {
+    monitor.source.disconnect()
+    monitor.analyser.disconnect()
+  } catch {
+    // The browser may already have disconnected a node for an ended track.
+  }
+  setParticipantSpeaking(session, participantId, false)
+}
+
+function addSpeakingMonitor(
+  session: ActiveSession,
+  participantId: string,
+  stream: MediaStream,
+) {
+  const activity = session.speakingActivity
+  if (!activity || stream.getAudioTracks().length === 0) return
+
+  removeSpeakingMonitor(session, participantId)
+
+  let source: MediaStreamAudioSourceNode | null = null
+  let analyser: AnalyserNode | null = null
+  try {
+    source = activity.context.createMediaStreamSource(stream)
+    analyser = activity.context.createAnalyser()
+    analyser.fftSize = SPEAKING_ANALYSER_FFT_SIZE
+    analyser.smoothingTimeConstant = 0.35
+    source.connect(analyser)
+    activity.monitors.set(participantId, {
+      analyser,
+      detector: createSpeakingDetector(),
+      samples: new Float32Array(analyser.fftSize),
+      source,
+      stream,
+    })
+  } catch {
+    try {
+      source?.disconnect()
+      analyser?.disconnect()
+    } catch {
+      // Voice remains available even when Web Audio cannot inspect this stream.
+    }
+  }
+}
+
+function sampleSpeakingActivity(session: ActiveSession) {
+  const activity = session.speakingActivity
+  if (!activity || session.disposed) return
+
+  const capturedAtMs = performance.now()
+  for (const [participantId, monitor] of activity.monitors) {
+    const hasEnabledAudio = monitor.stream
+      .getAudioTracks()
+      .some((track) => track.enabled && track.readyState !== 'ended')
+
+    if (!hasEnabledAudio) {
+      resetSpeakingMonitor(session, participantId)
+      continue
+    }
+
+    try {
+      monitor.analyser.getFloatTimeDomainData(monitor.samples)
+      setParticipantSpeaking(
+        session,
+        participantId,
+        monitor.detector.update(monitor.samples, capturedAtMs),
+      )
+    } catch {
+      removeSpeakingMonitor(session, participantId)
+    }
+  }
+}
+
+function startSpeakingActivity(session: ActiveSession) {
+  const AudioContextConstructor = getAudioContextConstructor()
+  if (!AudioContextConstructor) return
+
+  try {
+    const context = new AudioContextConstructor()
+    session.speakingActivity = {
+      context,
+      intervalId: window.setInterval(
+        () => sampleSpeakingActivity(session),
+        SPEAKING_SAMPLE_INTERVAL_MS,
+      ),
+      monitors: new Map(),
+      speakingParticipantIds: new Set(),
+    }
+    try {
+      void context.resume().catch(() => undefined)
+    } catch {
+      // Some implementations throw synchronously while resuming a context.
+    }
+    addSpeakingMonitor(session, session.localParticipant.id, session.localStream)
+  } catch {
+    session.speakingActivity = null
+  }
+}
+
+async function stopSpeakingActivity(session: ActiveSession) {
+  const activity = session.speakingActivity
+  if (!activity) return
+
+  window.clearInterval(activity.intervalId)
+  for (const monitor of activity.monitors.values()) {
+    try {
+      monitor.source.disconnect()
+      monitor.analyser.disconnect()
+    } catch {
+      // The stream or node may already have ended during session cleanup.
+    }
+  }
+  activity.monitors.clear()
+  activity.speakingParticipantIds.clear()
+  session.speakingActivity = null
+
+  try {
+    if (activity.context.state !== 'closed') await activity.context.close()
+  } catch {
+    // Web Audio cleanup must never prevent WebRTC cleanup.
+  }
+}
+
 function placeholderParticipant(participantId: string): VoiceParticipant {
   return {
     id: participantId,
@@ -384,6 +571,7 @@ function closePeer(session: ActiveSession, participantId: string) {
   }
 
   peer.closed = true
+  removeSpeakingMonitor(session, participantId)
   peer.connection.onconnectionstatechange = null
   peer.connection.onicecandidate = null
   peer.connection.onnegotiationneeded = null
@@ -475,12 +663,16 @@ function createPeer(session: ActiveSession, participantId: string) {
       'ended',
       () => {
         targetStream.removeTrack(track)
+        if (track.kind === 'audio' && targetStream.getAudioTracks().length === 0) {
+          removeSpeakingMonitor(session, participantId)
+        }
         session.publishPeers()
       },
       { once: true },
     )
 
     if (track.kind === 'audio') {
+      addSpeakingMonitor(session, participantId, peer.audioStream)
       void playRemoteAudio(session, peer)
     }
 
@@ -726,6 +918,7 @@ async function disposeSession(session: ActiveSession) {
 
   session.disposed = true
   session.screenRequestVersion += 1
+  await stopSpeakingActivity(session)
 
   for (const participantId of [...session.peers.keys()]) {
     closePeer(session, participantId)
@@ -765,13 +958,19 @@ export function useVoiceRoom({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [localScreenStream, setLocalScreenStream] =
     useState<MediaStream | null>(null)
-  const [isMuted, setMutedState] = useState(false)
+  const [isSelfMuted, setSelfMutedState] = useState(false)
+  const [isServerMuted, setServerMutedState] = useState(false)
+  const [speakingParticipantIds, setSpeakingParticipantIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set())
   const [diagnostics, setDiagnostics] = useState<VoiceDiagnostics>(EMPTY_DIAGNOSTICS)
 
   const mountedRef = useRef(true)
   const generationRef = useRef(0)
   const joiningRef = useRef(false)
   const sessionRef = useRef<ActiveSession | null>(null)
+  const selfMutedRef = useRef(false)
+  const serverMutedRef = useRef(false)
   const onErrorRef = useRef(onError)
 
   useEffect(() => {
@@ -800,7 +999,9 @@ export function useVoiceRoom({
     setRemotePeers([])
     setLocalStream(null)
     setLocalScreenStream(null)
-    setMutedState(false)
+    selfMutedRef.current = false
+    setSelfMutedState(false)
+    setSpeakingParticipantIds(new Set())
     setDiagnostics(EMPTY_DIAGNOSTICS)
   }, [])
 
@@ -859,6 +1060,7 @@ export function useVoiceRoom({
       screenRequestVersion: 0,
       participants: new Map([[participant.id, participant]]),
       peers: new Map(),
+      speakingActivity: null,
       unsubscribers: [],
       disposed: false,
       reportError,
@@ -891,6 +1093,13 @@ export function useVoiceRoom({
           setRemotePeers(peers)
         }
       },
+      publishSpeakingParticipants: () => {
+        if (mountedRef.current && sessionRef.current === session) {
+          setSpeakingParticipantIds(
+            new Set(session.speakingActivity?.speakingParticipantIds ?? []),
+          )
+        }
+      },
       publishLocalScreen: (stream) => {
         if (mountedRef.current && sessionRef.current === session) {
           setLocalScreenStream(stream)
@@ -899,6 +1108,10 @@ export function useVoiceRoom({
     }
 
     sessionRef.current = session
+    for (const track of microphoneStream.getAudioTracks()) {
+      track.enabled = !(selfMutedRef.current || serverMutedRef.current)
+    }
+    startSpeakingActivity(session)
     setLocalStream(microphoneStream)
     setParticipants([participant])
 
@@ -981,22 +1194,36 @@ export function useVoiceRoom({
       return
     }
 
+    if (serverMutedRef.current) return
+
+    selfMutedRef.current = muted
+
     for (const track of session.localStream.getAudioTracks()) {
-      track.enabled = !muted
+      track.enabled = !(muted || serverMutedRef.current)
     }
-    setMutedState(muted)
+    if (muted) resetSpeakingMonitor(session, session.localParticipant.id)
+    setSelfMutedState(muted)
+  }, [])
+
+  const setServerMuted = useCallback((muted: boolean) => {
+    serverMutedRef.current = muted
+    setServerMutedState(muted)
+
+    const session = sessionRef.current
+    if (!session || session.disposed) return
+    for (const track of session.localStream.getAudioTracks()) {
+      track.enabled = !(muted || selfMutedRef.current)
+    }
+    if (muted) resetSpeakingMonitor(session, session.localParticipant.id)
   }, [])
 
   const toggleMute = useCallback(() => {
     const session = sessionRef.current
-    if (!session || session.disposed) {
+    if (!session || session.disposed || serverMutedRef.current) {
       return
     }
 
-    const hasEnabledTrack = session.localStream
-      .getAudioTracks()
-      .some(({ enabled }) => enabled)
-    setMuted(hasEnabledTrack)
+    setMuted(!selfMutedRef.current)
   }, [setMuted])
 
   const stopScreenShare = useCallback(async () => {
@@ -1152,12 +1379,15 @@ export function useVoiceRoom({
     remotePeers,
     localStream,
     localScreenStream,
-    isMuted,
+    isMuted: isSelfMuted || isServerMuted,
+    isServerMuted,
     isScreenSharing: localScreenStream !== null,
+    speakingParticipantIds,
     diagnostics,
     join,
     leave,
     setMuted,
+    setServerMuted,
     toggleMute,
     startScreenShare,
     stopScreenShare,

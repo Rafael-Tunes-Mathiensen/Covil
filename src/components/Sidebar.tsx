@@ -7,11 +7,13 @@ import {
   LogOut,
   Plus,
   RefreshCw,
+  Settings,
   ShieldCheck,
   Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { BrandMark } from './BrandMark'
-import type { Channel, Covil, Profile } from '../types/domain'
+import type { Channel, ChannelKind, Covil, Profile } from '../types/domain'
 import { Avatar } from './Avatar'
 
 interface SidebarProps {
@@ -27,6 +29,12 @@ interface SidebarProps {
   onRotateInvite?: () => Promise<string>
   isAppAdmin?: boolean
   onOpenAdmin?: () => void
+  canManageChannels?: boolean
+  canManageCovil?: boolean
+  onCreateChannel?: (kind: ChannelKind) => void
+  onOpenCovilSettings?: () => void
+  soundsEnabled?: boolean
+  onToggleSounds?: () => void
 }
 
 export function Sidebar({
@@ -42,6 +50,12 @@ export function Sidebar({
   onRotateInvite,
   isAppAdmin,
   onOpenAdmin,
+  canManageChannels = false,
+  canManageCovil = false,
+  onCreateChannel,
+  onOpenCovilSettings,
+  soundsEnabled = true,
+  onToggleSounds,
 }: SidebarProps) {
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [isCopyingInvite, setIsCopyingInvite] = useState(false)
@@ -89,11 +103,16 @@ export function Sidebar({
       </button>
 
       <nav className="channel-list" aria-label="Canais do Covil">
-        <ChannelSection title="Texto" actionLabel="Adicionar canal">
+        <ChannelSection
+          actionLabel="Adicionar canal de texto"
+          onAction={canManageChannels && onCreateChannel ? () => onCreateChannel('text') : undefined}
+          title="Texto"
+        >
           {textChannels.map((channel) => (
             <button
               className={`channel${currentChannelId === channel.id ? ' is-active' : ''}`}
               key={channel.id}
+              aria-label={`Canal de texto ${channel.name}`}
               onClick={() => onSelectChannel(channel)}
               type="button"
             >
@@ -102,13 +121,18 @@ export function Sidebar({
           ))}
         </ChannelSection>
 
-        <ChannelSection title="Voz" actionLabel="Adicionar sala">
+        <ChannelSection
+          actionLabel="Adicionar sala de voz"
+          onAction={canManageChannels && onCreateChannel ? () => onCreateChannel('voice') : undefined}
+          title="Voz"
+        >
           {voiceChannels.map((channel) => {
             const isConnected = voiceStatus === 'joined' && voiceChannelId === channel.id
             return (
               <button
                 className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}`}
                 key={channel.id}
+                aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
                 onClick={() => onSelectChannel(channel)}
                 type="button"
               >
@@ -158,6 +182,23 @@ export function Sidebar({
           <strong>{currentUser.displayName}</strong>
           <small>Disponível</small>
         </span>
+        {onToggleSounds && (
+          <button
+            aria-label={soundsEnabled ? 'Desativar sons da interface' : 'Ativar sons da interface'}
+            aria-pressed={soundsEnabled}
+            className="sound-toggle"
+            onClick={onToggleSounds}
+            title={soundsEnabled ? 'Sons ligados' : 'Sons desligados'}
+            type="button"
+          >
+            {soundsEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+          </button>
+        )}
+        {canManageCovil && onOpenCovilSettings && (
+          <button aria-label="Abrir configurações do Covil" onClick={onOpenCovilSettings} title="Cargos e membros" type="button">
+            <Settings size={17} />
+          </button>
+        )}
         {isAppAdmin && onOpenAdmin && (
           <button aria-label="Abrir console do proprietário" className="admin-launch" onClick={onOpenAdmin} title="Console do proprietário" type="button">
             <ShieldCheck size={17} />
@@ -176,15 +217,20 @@ export function Sidebar({
 function ChannelSection({
   title,
   actionLabel,
+  onAction,
   children,
 }: {
   title: string
   actionLabel: string
+  onAction?: () => void
   children: React.ReactNode
 }) {
   return (
     <section className="channel-section">
-      <header><span>{title}</span><button aria-label={actionLabel} type="button"><Plus size={15} /></button></header>
+      <header>
+        <span>{title}</span>
+        {onAction && <button aria-label={actionLabel} onClick={onAction} type="button"><Plus size={15} /></button>}
+      </header>
       {children}
     </section>
   )

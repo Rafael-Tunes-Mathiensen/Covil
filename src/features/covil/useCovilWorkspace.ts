@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { normalizeMessage } from '../../lib/formatters'
-import type { Channel, ChatMessage, Covil, MemberRole, Profile } from '../../types/domain'
+import type {
+  Channel,
+  ChannelKind,
+  ChatMessage,
+  Covil,
+  CovilPermission,
+  CovilRole,
+  MemberRole,
+  MemberRoleAssignment,
+  Profile,
+  VoiceModerationAction,
+  VoiceModerationState,
+} from '../../types/domain'
+import { getEffectivePermissions } from './permissions'
 
 interface MembershipRow {
   covil_id: string
@@ -39,6 +52,29 @@ interface MessageRow {
   created_at: string
 }
 
+interface CovilRoleRow {
+  id: string
+  covil_id: string
+  name: string
+  color: string | null
+  permissions: CovilPermission[]
+  position: number
+}
+
+interface MemberRoleAssignmentRow {
+  covil_id: string
+  user_id: string
+  role_id: string
+}
+
+interface VoiceModerationRow {
+  channel_id: string
+  user_id: string
+  server_muted: boolean
+  disconnect_requested_at: string | null
+  updated_at: string
+}
+
 function avatarColor(id: string) {
   const colors = ['#ff7043', '#7a8cff', '#55c98a', '#d58cff', '#e8b35d']
   const hash = [...id].reduce((total, character) => total + character.charCodeAt(0), 0)
@@ -66,6 +102,9 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   const [channels, setChannels] = useState<Channel[]>([])
   const [members, setMembers] = useState<Profile[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [roles, setRoles] = useState<CovilRole[]>([])
+  const [memberRoleAssignments, setMemberRoleAssignments] = useState<MemberRoleAssignment[]>([])
+  const [voiceModerationStates, setVoiceModerationStates] = useState<VoiceModerationState[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -83,8 +122,8 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     messageRequestRef.current += 1
   }, [selectedChannel?.id])
 
-  const loadWorkspace = useCallback(async () => {
-    setIsLoading(true)
+  const loadWorkspace = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true)
     setError(null)
 
     try {
@@ -103,10 +142,13 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         setChannels([])
         setMembers([])
         setMessages([])
+        setRoles([])
+        setMemberRoleAssignments([])
+        setVoiceModerationStates([])
         return
       }
 
-      const [covilResult, channelResult, memberResult] = await Promise.all([
+      const [covilResult, channelResult, memberResult, roleResult, assignmentResult] = await Promise.all([
         client.from('covils').select('id, name').eq('id', membership.covil_id).single(),
         client
           .from('channels')
@@ -114,11 +156,22 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           .eq('covil_id', membership.covil_id)
           .order('position'),
         client.from('covil_members').select('user_id, role').eq('covil_id', membership.covil_id),
+        client
+          .from('covil_roles')
+          .select('id, covil_id, name, color, permissions, position')
+          .eq('covil_id', membership.covil_id)
+          .order('position'),
+        client
+          .from('covil_member_roles')
+          .select('covil_id, user_id, role_id')
+          .eq('covil_id', membership.covil_id),
       ])
 
       if (covilResult.error) throw covilResult.error
       if (channelResult.error) throw channelResult.error
       if (memberResult.error) throw memberResult.error
+      if (roleResult.error) throw roleResult.error
+      if (assignmentResult.error) throw assignmentResult.error
 
       const covilRow = covilResult.data as CovilRow
       let inviteCode = ''
@@ -148,10 +201,47 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         kind: channel.kind,
         position: channel.position,
       }))
+      const nextRoles = ((roleResult.data ?? []) as CovilRoleRow[]).map((role) => ({
+        id: role.id,
+        covilId: role.covil_id,
+        name: role.name,
+        color: role.color ?? '#626b78',
+        permissions: role.permissions,
+        position: role.position,
+      }))
+      const nextAssignments = ((assignmentResult.data ?? []) as MemberRoleAssignmentRow[]).map(
+        (assignment) => ({
+          covilId: assignment.covil_id,
+          userId: assignment.user_id,
+          roleId: assignment.role_id,
+        }),
+      )
+      let nextModerationStates: VoiceModerationState[] = []
+      const voiceChannelIds = nextChannels
+        .filter(({ kind }) => kind === 'voice')
+        .map(({ id }) => id)
+
+      if (voiceChannelIds.length > 0) {
+        const moderationResult = await client
+          .from('voice_moderation_states')
+          .select('channel_id, user_id, server_muted, disconnect_requested_at, updated_at')
+          .in('channel_id', voiceChannelIds)
+        if (moderationResult.error) throw moderationResult.error
+        nextModerationStates = ((moderationResult.data ?? []) as VoiceModerationRow[]).map((state) => ({
+          channelId: state.channel_id,
+          userId: state.user_id,
+          serverMuted: state.server_muted,
+          disconnectRequestedAt: state.disconnect_requested_at,
+          updatedAt: state.updated_at,
+        }))
+      }
 
       setCovil({ id: covilRow.id, name: covilRow.name, inviteCode })
       setMembers(nextMembers)
       setChannels(nextChannels)
+      setRoles(nextRoles)
+      setMemberRoleAssignments(nextAssignments)
+      setVoiceModerationStates(nextModerationStates)
       setSelectedChannelId((current) => {
         if (current && nextChannels.some(({ id }) => id === current)) return current
         return nextChannels.find(({ kind }) => kind === 'text')?.id ?? nextChannels[0]?.id ?? null
@@ -215,7 +305,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   useEffect(() => {
     // A consulta inicial sincroniza o estado React com a sessão externa do Supabase.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadWorkspace()
+    void loadWorkspace(true)
   }, [loadWorkspace])
 
   useEffect(() => {
@@ -231,7 +321,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covil_members',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(),
+        () => void loadWorkspace(false),
       )
       .on(
         'postgres_changes',
@@ -240,7 +330,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           schema: 'public',
           table: 'profiles',
         },
-        () => void loadWorkspace(),
+        () => void loadWorkspace(false),
       )
       .on(
         'postgres_changes',
@@ -250,7 +340,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'channels',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(),
+        () => void loadWorkspace(false),
       )
       .on(
         'postgres_changes',
@@ -260,7 +350,36 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covils',
           filter: `id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(),
+        () => void loadWorkspace(false),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'covil_roles',
+          filter: `covil_id=eq.${covil.id}`,
+        },
+        () => void loadWorkspace(false),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'covil_member_roles',
+          filter: `covil_id=eq.${covil.id}`,
+        },
+        () => void loadWorkspace(false),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'voice_moderation_states',
+        },
+        () => void loadWorkspace(false),
       )
       .subscribe()
 
@@ -300,7 +419,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     setError(null)
     const result = await client.rpc('create_covil', { p_name: name })
     if (result.error) setError(result.error.message)
-    else await loadWorkspace()
+    else await loadWorkspace(false)
     setIsSubmitting(false)
   }
 
@@ -309,7 +428,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     setError(null)
     const result = await client.rpc('join_covil_by_invite', { p_invite_code: inviteCode })
     if (result.error) setError(result.error.message)
-    else await loadWorkspace()
+    else await loadWorkspace(false)
     setIsSubmitting(false)
   }
 
@@ -345,6 +464,76 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     return inviteCode
   }
 
+  async function mutateWorkspace(functionName: string, args: Record<string, unknown>) {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const result = await client.rpc(functionName, args)
+      if (result.error) throw result.error
+      await loadWorkspace(false)
+      return result.data
+    } catch (cause) {
+      const message = getErrorMessage(cause)
+      setError(message)
+      throw new Error(message, { cause })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function createChannel(name: string, kind: ChannelKind) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    return mutateWorkspace('create_covil_channel', {
+      p_covil_id: covil.id,
+      p_name: name,
+      p_kind: kind,
+    })
+  }
+
+  async function createRole(name: string, color: string, permissions: CovilPermission[]) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    return mutateWorkspace('create_covil_role', {
+      p_covil_id: covil.id,
+      p_name: name,
+      p_color: color,
+      p_permissions: permissions,
+    })
+  }
+
+  async function deleteRole(roleId: string) {
+    return mutateWorkspace('delete_covil_role', { p_role_id: roleId })
+  }
+
+  async function setMemberRole(userId: string, roleId: string, assigned: boolean) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    return mutateWorkspace('set_covil_member_role', {
+      p_covil_id: covil.id,
+      p_user_id: userId,
+      p_role_id: roleId,
+      p_assigned: assigned,
+    })
+  }
+
+  async function removeMember(userId: string) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    return mutateWorkspace('remove_covil_member', {
+      p_covil_id: covil.id,
+      p_user_id: userId,
+    })
+  }
+
+  async function moderateVoice(
+    channelId: string,
+    userId: string,
+    action: VoiceModerationAction,
+  ) {
+    return mutateWorkspace('moderate_covil_voice', {
+      p_channel_id: channelId,
+      p_user_id: userId,
+      p_action: action,
+    })
+  }
+
   const currentUser =
     members.find(({ id }) => id === user.id) ??
     ({
@@ -355,11 +544,22 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       role: membershipRoleFallback(covil),
     } satisfies Profile)
 
+  const currentPermissions = getEffectivePermissions(
+    currentUser.role ?? 'member',
+    currentUser.id,
+    roles,
+    memberRoleAssignments,
+  )
+
   return {
     covil,
     channels,
     members,
     messages,
+    roles,
+    memberRoleAssignments,
+    voiceModerationStates,
+    currentPermissions,
     selectedChannel,
     currentUser,
     isLoading,
@@ -371,6 +571,12 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     sendMessage,
     refreshInvite,
     rotateInvite,
+    createChannel,
+    createRole,
+    deleteRole,
+    setMemberRole,
+    removeMember,
+    moderateVoice,
     reload: loadWorkspace,
   }
 }

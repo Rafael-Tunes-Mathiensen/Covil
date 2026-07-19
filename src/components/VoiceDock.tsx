@@ -4,33 +4,38 @@ import type { UseVoiceRoomResult } from '../features/voice'
 interface VoiceDockProps {
   roomName: string
   voice: UseVoiceRoomResult
+  onToggleMute?: () => void
+  onToggleShare?: () => void | Promise<void>
+  onLeave?: () => void | Promise<void>
 }
 
-export function VoiceDock({ roomName, voice }: VoiceDockProps) {
+export function VoiceDock({ roomName, voice, onToggleMute, onToggleShare, onLeave }: VoiceDockProps) {
   if (voice.status === 'idle') return null
 
   return (
     <div className="voice-dock" aria-label="Controles da chamada">
       <div className="voice-dock__status">
         <span><Headphones size={16} /></span>
-        <p><strong>{roomName}</strong><small>{voice.status === 'joined' ? 'Voz conectada' : 'Conectando…'}</small></p>
+        <p><strong>{roomName}</strong><small>{voice.isServerMuted ? 'Silenciado pela moderação' : voice.status === 'joined' ? 'Voz conectada' : 'Conectando…'}</small></p>
       </div>
       <div className="voice-dock__controls">
         <button
-          aria-label={voice.isMuted ? 'Ativar microfone' : 'Silenciar microfone'}
+          aria-label={voice.isServerMuted ? 'Microfone silenciado pela moderação' : voice.isMuted ? 'Ativar microfone' : 'Silenciar microfone'}
+          aria-pressed={voice.isMuted}
           className={voice.isMuted ? 'is-off' : ''}
-          disabled={voice.status !== 'joined'}
-          onClick={voice.toggleMute}
-          title={voice.isMuted ? 'Ativar microfone' : 'Silenciar'}
+          disabled={voice.status !== 'joined' || voice.isServerMuted}
+          onClick={onToggleMute ?? voice.toggleMute}
+          title={voice.isServerMuted ? 'O moderador silenciou seu microfone' : voice.isMuted ? 'Ativar microfone' : 'Silenciar'}
           type="button"
         >
           {voice.isMuted ? <MicOff size={19} /> : <Mic size={19} />}
         </button>
         <button
           aria-label={voice.isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
+          aria-pressed={voice.isScreenSharing}
           className={voice.isScreenSharing ? 'is-active' : ''}
           disabled={voice.status !== 'joined'}
-          onClick={() => void (voice.isScreenSharing ? voice.stopScreenShare() : voice.startScreenShare())}
+          onClick={() => void (onToggleShare ? onToggleShare() : (voice.isScreenSharing ? voice.stopScreenShare() : voice.startScreenShare()))}
           title={voice.isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
           type="button"
         >
@@ -40,7 +45,7 @@ export function VoiceDock({ roomName, voice }: VoiceDockProps) {
         <button
           aria-label="Sair da chamada"
           className="hangup-button"
-          onClick={() => void voice.leave()}
+          onClick={() => void (onLeave ? onLeave() : voice.leave())}
           title="Sair da chamada"
           type="button"
         >

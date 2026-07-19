@@ -1,8 +1,9 @@
 # Supabase do Covil
 
-O Supabase concentra autenticação, perfis, grupos privados, canais, mensagens e
-sinalização em tempo real. Áudio e compartilhamento de tela continuam trafegando
-entre os participantes por WebRTC; eles não são armazenados no banco.
+O Supabase concentra autenticação, perfis, grupos privados, canais, cargos,
+mensagens, autorização e sinalização em tempo real. Áudio, tela e amostras usadas
+para detectar fala trafegam ou são analisados nos navegadores e não são
+armazenados no banco.
 
 ## Preparar um projeto
 
@@ -32,10 +33,12 @@ entre os participantes por WebRTC; eles não são armazenados no banco.
    npx supabase migration list
    ```
 
-As migrations canônicas ficam em `supabase/migrations/`: a primeira cria o
-modelo privado e a segunda adiciona o limite de seis membros e o console do
-proprietário. Não execute trechos isolados no ambiente remoto: funções, grants,
-triggers e policies foram projetados para entrar juntos.
+As cinco migrations canônicas ficam em `supabase/migrations/`. Elas aplicam, em
+ordem, o modelo privado, o limite de seis membros e console do proprietário, o
+ajuste de métricas, o Realtime do workspace e, na migration 005, cargos, criação
+controlada de canais e moderação cooperativa de voz. Não execute trechos
+isolados: funções, grants, triggers e policies foram projetados para entrar
+juntos.
 
 Para um banco local já inicializado pelo Supabase CLI, `supabase db reset`
 reaplica todas as migrations. Esse comando apaga os dados locais existentes.
@@ -63,7 +66,10 @@ habilitar confirmação de e-mail.
 | `profiles` | Nome e avatar ligados a `auth.users` | Visível ao próprio usuário e a pessoas que compartilham um Covil |
 | `covils` | Grupo privado e código de convite | Membros veem apenas os dados públicos; só o owner consulta ou renova o convite |
 | `covil_members` | Participantes e papel `owner/member` | Visível aos membros do mesmo Covil |
-| `channels` | Canais `text` e `voice` | Membros leem; owner administra |
+| `channels` | Canais `text` e `voice` | Membros leem; criação usa RPC e permissão; owner edita ou exclui |
+| `covil_roles` | Cargos com cor e permissões | Membros leem; só o owner cria ou exclui |
+| `covil_member_roles` | Atribuições acumuláveis de cargos | Membros leem; só o owner atribui ou remove |
+| `voice_moderation_states` | Mute persistente e pedidos de desconexão por sala | Membros leem; escrita somente pela RPC autorizada |
 | `messages` | Histórico dos canais de texto | Membros leem; cada autor escreve, edita ou exclui as próprias |
 
 Ao cadastrar um usuário, o trigger `private.handle_new_user()` cria o perfil. A
@@ -98,6 +104,70 @@ A associação não é duplicada se o usuário já for membro. Cada código acei
 duas tentativas chegam ao mesmo tempo. O código pode ser digitado em maiúsculas
 ou minúsculas. O banco rejeita uma sétima associação mesmo sob tentativas
 concorrentes.
+
+### Criar canais
+
+Owner e membros com `manage_channels` criam canais pela RPC; `INSERT` direto é
+revogado. A função trava a linha do Covil para respeitar o limite de 25 mesmo em
+requisições concorrentes.
+
+```ts
+const { data: channelId, error } = await supabase.rpc('create_covil_channel', {
+  p_covil_id: covilId,
+  p_name: 'estratégias',
+  p_kind: 'text', // ou 'voice'
+})
+```
+
+### Criar e atribuir cargos
+
+Somente o owner administra os até 12 cargos do Covil. Um membro comum pode
+receber vários cargos, e sua permissão efetiva é a união de `manage_channels`,
+`moderate_voice` e `remove_members` presentes neles.
+
+```ts
+const { data: roleId } = await supabase.rpc('create_covil_role', {
+  p_covil_id: covilId,
+  p_name: 'Guardião da call',
+  p_color: '#FF7043',
+  p_permissions: ['moderate_voice'],
+})
+
+await supabase.rpc('set_covil_member_role', {
+  p_covil_id: covilId,
+  p_user_id: memberId,
+  p_role_id: roleId,
+  p_assigned: true,
+})
+```
+
+`delete_covil_role()` exclui o cargo e suas atribuições. O registro `owner` é a
+fonte exclusiva de propriedade: cargos não transferem ownership e não são
+atribuídos ao fundador.
+
+### Moderar voz e remover membros
+
+Owner e cargos autorizados usam RPCs em vez de escrever diretamente nas tabelas:
+
+```ts
+await supabase.rpc('moderate_covil_voice', {
+  p_channel_id: voiceChannelId,
+  p_user_id: memberId,
+  p_action: 'mute', // 'unmute' ou 'disconnect'
+})
+
+await supabase.rpc('remove_covil_member', {
+  p_covil_id: covilId,
+  p_user_id: memberId,
+})
+```
+
+`moderate_covil_voice()` exige `moderate_voice` e protege o fundador;
+`remove_covil_member()` aceita a própria saída ou `remove_members` e protege o
+fundador e a conta proprietária da aplicação. O mute e o pedido de desconexão
+são estados persistidos e entregues pelo Realtime, mas aplicados pelo cliente.
+Sem uma SFU, um cliente adulterado pode ignorá-los; não trate o recurso como
+contenção contra um participante malicioso.
 
 ### Console do proprietário
 
@@ -146,8 +216,9 @@ um canal de voz também são rejeitadas.
 
 ### Ouvir atualizações do Covil
 
-`messages`, `covil_members`, `profiles`, `channels` e `covils` são adicionadas à
-publicação `supabase_realtime`. Mensagens usam o filtro do canal atual:
+`messages`, `covil_members`, `profiles`, `channels`, `covils`, `covil_roles`,
+`covil_member_roles` e `voice_moderation_states` integram a publicação
+`supabase_realtime`. Mensagens usam o filtro do canal atual:
 
 ```ts
 const subscription = supabase
@@ -166,10 +237,10 @@ const subscription = supabase
 ```
 
 O hook `useCovilWorkspace` mantém outra assinatura para o Covil atual. Mudanças
-em participantes, perfis, canais ou dados do grupo fazem o cliente buscar
-novamente apenas os registros permitidos pelas policies RLS. Assim, entradas,
-remoções e alterações aparecem nos navegadores conectados sem recarregar a
-página.
+em participantes, perfis, canais, cargos, atribuições, moderação ou dados do
+grupo fazem o cliente buscar novamente apenas os registros permitidos pelas
+policies RLS. Assim, entradas, remoções e alterações aparecem nos navegadores
+conectados sem recarregar a página.
 
 Remova cada canal Realtime ao trocar de tela ou sair:
 
@@ -199,11 +270,15 @@ para usuários autenticados que passam pelas policies acima.
 | Lotação do Covil | Máximo de 6 memberships, garantido por trigger transacional |
 | Consultar/renovar convite | Somente o owner, pelas RPCs dedicadas |
 | Atualizar/excluir Covil | Owner; apenas `name` pode ser atualizado |
-| Sair/remover membro | Membro pode remover a si próprio; owner pode remover membros, nunca o registro owner |
-| Criar/editar/excluir canal | Owner do Covil |
+| Sair/remover membro | Pela RPC: própria saída ou `remove_members`; fundador e app owner são protegidos |
+| Criar canal | Pela RPC: owner ou cargo com `manage_channels`; máximo de 25 por Covil |
+| Editar/excluir canal | Owner do Covil |
+| Ler cargos e atribuições | Membro do mesmo Covil |
+| Criar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis |
 | Ler mensagem | Membro atual do canal/Covil |
 | Criar/editar/excluir mensagem | Autor autenticado e membro atual; canal deve ser de texto |
 | Sinalizar e anunciar presença na voz | Membro autenticado do Covil associado ao canal privado |
+| Moderar voz | Owner ou cargo com `moderate_voice`; fundador protegido; aplicação cooperativa no cliente |
 | Ver console operacional | Somente UUID allowlisted em `private.app_admins`; sem leitura global de mensagens |
 | Remover acesso pelo console | Administrador global pode remover membro comum; fundador e proprietário são protegidos |
 | Acesso anônimo | Nenhum acesso às tabelas ou RPCs |
@@ -232,18 +307,27 @@ funções `SECURITY DEFINER` têm `search_path` vazio e recebem a identidade de
 - Em Postgres Changes, eventos `DELETE` têm limitações de filtragem/RLS porque a
   linha já não existe. O cliente não deve depender do payload antigo completo;
   revalide a lista quando precisar refletir exclusões remotas.
+- `voice_moderation_states` autoriza e sincroniza a intenção de moderação, mas
+  não intercepta mídia P2P. Mute e desconexão são garantidos apenas no cliente
+  oficial; enforcement resistente a cliente adulterado exige uma SFU controlada.
 - Não exponha o schema `private` na configuração de schemas da Data API.
 
 ## Verificação manual mínima
 
-Teste com dois usuários autenticados e um terceiro sem associação:
+Teste com três membros autenticados e um quarto usuário sem associação:
 
 1. O usuário A cria um Covil e recebe os dois canais padrão.
-2. O usuário B entra com o convite, passa a ver o Covil, os canais e o perfil
-   de A; reutilizar o código anterior falha.
-3. O usuário C não consegue ler nenhum desses registros.
-4. B envia uma mensagem em `geral`; A a recebe pelo Realtime.
-5. B não consegue criar um canal, mudar o Covil nem publicar em `Lobby`.
-6. B sai removendo sua associação e deixa imediatamente de ler mensagens.
-7. A consegue remover membros e excluir o Covil, mas ninguém consegue alterar
-   `owner_id`, `role`, autores ou timestamps pelo cliente.
+2. B e C entram, cada um com o convite vigente; reutilizar um código anterior
+   falha.
+3. O quarto usuário não consegue ler nenhum registro do Covil.
+4. B envia uma mensagem em `geral`; A e C a recebem pelo Realtime.
+5. Sem cargo, B não consegue criar canal, moderar voz, remover A nem administrar
+   cargos.
+6. A cria e atribui a B cargos com `manage_channels` e `moderate_voice`; B cria
+   um novo canal e modera C, mas continua sem administrar cargos nem
+   moderar o fundador.
+7. Ao trocar de sala durante uma chamada, o cliente encerra a sala anterior antes
+   de entrar na nova; mute e disconnect chegam pelo Realtime ao alvo.
+8. A RPC rejeita o 26º canal e o 13º cargo, inclusive sob concorrência.
+9. B sai pela RPC e deixa de ler mensagens. A pode remover membros comuns, mas
+   ninguém altera `owner_id`, `role`, autores ou timestamps pelo cliente.

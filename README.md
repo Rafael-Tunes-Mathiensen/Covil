@@ -5,7 +5,7 @@
   <p>Um espaço privado de voz, mensagens e compartilhamento de tela para grupos pequenos.</p>
 
   [![Qualidade](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml)
-  ![Versão](https://img.shields.io/badge/versão-0.1.0-ff7043)
+  ![Versão](https://img.shields.io/badge/versão-0.2.0-ff7043)
   ![Licença](https://img.shields.io/badge/licença-MIT-929aa8)
 </div>
 
@@ -20,11 +20,14 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - identidade visual responsiva e instalável como PWA;
 - cadastro e login por e-mail com Supabase Auth;
 - criação de grupo privado e entrada por convite de uso único;
-- canais de texto com histórico e atualização em tempo real;
-- sala de voz mesh para até seis participantes;
-- mute, limpeza de mídia e recuperação básica de conexão;
+- canais de texto e salas de voz criados pelo owner ou por cargos autorizados, até o limite de 25 canais;
+- chamadas mesh para até seis participantes, com troca segura entre salas;
+- indicador local de quem está falando, mute, limpeza de mídia e recuperação básica de conexão;
 - compartilhamento de tela em 720p/30 fps;
-- políticas RLS e funções seguras no PostgreSQL;
+- até 12 cargos acumuláveis com permissões para criar canais, moderar voz ou remover membros;
+- mute persistente e desconexão cooperativa da chamada, sem permitir moderar o fundador;
+- políticas RLS e RPCs autorizadas no PostgreSQL;
+- animações responsivas, diálogos acessíveis e efeitos sonoros sintetizados que podem ser desativados;
 - console exclusivo do proprietário para acessos, uso do banco e diagnóstico WebRTC;
 - modo de demonstração sem conta ou backend;
 - testes, lint, build e CI no GitHub Actions.
@@ -95,7 +98,8 @@ covil/
 │   │   ├── auth/            # sessão e acesso
 │   │   ├── covil/           # grupos, canais e chat
 │   │   ├── onboarding/      # criação e convite
-│   │   └── voice/           # WebRTC e sinalização
+│   │   ├── sound/           # efeitos sonoros sintetizados
+│   │   └── voice/           # WebRTC, fala e sinalização
 │   ├── lib/                 # configuração e utilitários
 │   ├── styles/              # sistema visual
 │   └── types/               # modelo de domínio
@@ -124,15 +128,17 @@ covil/
 
 ## Estado e próximos passos
 
-Esta é a fundação funcional do MVP. A interface e o modo local estão prontos; a integração real precisa ser validada em um projeto Supabase e em duas redes diferentes.
+A versão 0.2.0 reúne o núcleo funcional do MVP. Os riscos restantes concentram-se na validação com seis contas simultâneas e na conectividade de redes restritivas.
 
 - [x] Chat, autenticação e grupos privados
 - [x] Motor WebRTC mesh e compartilhamento de tela
+- [x] Canais múltiplos, cargos acumuláveis e moderação cooperativa
+- [x] Indicador de fala, efeitos sonoros e animações acessíveis
 - [x] PWA, documentação e CI
 - [ ] Teste ponta a ponta com seis contas reais
 - [ ] Credenciais TURN efêmeras para redes restritas
 - [ ] Seleção de dispositivos e volume individual
-- [ ] Notificações e indicador real de quem está falando
+- [ ] Notificações de mensagens
 - [ ] Aplicativo desktop para push-to-talk global
 
 ## Licença
