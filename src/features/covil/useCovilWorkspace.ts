@@ -91,6 +91,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       const membershipResult = await client
         .from('covil_members')
         .select('covil_id, role')
+        .eq('user_id', user.id)
         .order('joined_at', { ascending: true })
         .limit(1)
 
@@ -160,7 +161,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     } finally {
       setIsLoading(false)
     }
-  }, [client])
+  }, [client, user.id])
 
   const loadMessages = useCallback(async () => {
     const requestId = ++messageRequestRef.current
