@@ -144,10 +144,10 @@ Enviar `author_id`, `created_at` ou `updated_at` pelo cliente é bloqueado pelos
 grants de coluna. Mensagens vazias, acima de 4.000 caracteres ou destinadas a
 um canal de voz também são rejeitadas.
 
-### Ouvir novas mensagens
+### Ouvir atualizações do Covil
 
-`messages` é adicionada à publicação `supabase_realtime`. A inscrição ainda
-precisa usar o filtro do canal atual:
+`messages`, `covil_members`, `profiles`, `channels` e `covils` são adicionadas à
+publicação `supabase_realtime`. Mensagens usam o filtro do canal atual:
 
 ```ts
 const subscription = supabase
@@ -165,7 +165,13 @@ const subscription = supabase
   .subscribe()
 ```
 
-Remova o canal ao trocar de tela ou sair:
+O hook `useCovilWorkspace` mantém outra assinatura para o Covil atual. Mudanças
+em participantes, perfis, canais ou dados do grupo fazem o cliente buscar
+novamente apenas os registros permitidos pelas policies RLS. Assim, entradas,
+remoções e alterações aparecem nos navegadores conectados sem recarregar a
+página.
+
+Remova cada canal Realtime ao trocar de tela ou sair:
 
 ```ts
 await supabase.removeChannel(subscription)

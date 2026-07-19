@@ -219,6 +219,57 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   }, [loadWorkspace])
 
   useEffect(() => {
+    if (!covil?.id) return
+
+    const realtime = client
+      .channel(`workspace:${covil.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'covil_members',
+          filter: `covil_id=eq.${covil.id}`,
+        },
+        () => void loadWorkspace(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        () => void loadWorkspace(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'channels',
+          filter: `covil_id=eq.${covil.id}`,
+        },
+        () => void loadWorkspace(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'covils',
+          filter: `id=eq.${covil.id}`,
+        },
+        () => void loadWorkspace(),
+      )
+      .subscribe()
+
+    return () => {
+      void client.removeChannel(realtime)
+    }
+  }, [client, covil?.id, loadWorkspace])
+
+  useEffect(() => {
     // A troca de canal sincroniza a lista local com a assinatura Realtime externa.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([])
