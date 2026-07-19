@@ -3,6 +3,8 @@ export interface VoiceParticipant {
   id: string
   displayName: string
   avatarUrl?: string
+  /** Changes on every join and prevents replaying negotiation from an older call. */
+  sessionId?: string
 }
 
 export type VoiceSignal =
@@ -11,6 +13,7 @@ export type VoiceSignal =
       roomId: string
       from: string
       to: string
+      sessionId?: string
       description: RTCSessionDescriptionInit
     }
   | {
@@ -18,6 +21,7 @@ export type VoiceSignal =
       roomId: string
       from: string
       to: string
+      sessionId?: string
       candidate: RTCIceCandidateInit | null
     }
   | {
@@ -25,6 +29,7 @@ export type VoiceSignal =
       roomId: string
       from: string
       to: string
+      sessionId?: string
       active: boolean
     }
 
@@ -41,6 +46,14 @@ export interface PresenceSubscription {
   participant: VoiceParticipant
   /** Receives the complete, authoritative presence snapshot for the room. */
   onChange: (participants: readonly VoiceParticipant[]) => void
+  /** Called if Presence cannot be restored after the channel reconnects. */
+  onDisconnect?: (error: unknown) => void
+}
+
+export interface PresenceWatchSubscription {
+  roomId: string
+  /** Observes the room without announcing the local user as a caller. */
+  onChange: (participants: readonly VoiceParticipant[]) => void
 }
 
 /**
@@ -56,6 +69,9 @@ export interface SignalTransport {
   send(signal: VoiceSignal): void | Promise<void>
   presence(
     subscription: PresenceSubscription,
+  ): SignalUnsubscribe | Promise<SignalUnsubscribe>
+  watchPresence?(
+    subscription: PresenceWatchSubscription,
   ): SignalUnsubscribe | Promise<SignalUnsubscribe>
 }
 

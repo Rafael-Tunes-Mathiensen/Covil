@@ -3,7 +3,10 @@ import { AdminConsole } from '../features/admin/AdminConsole'
 import type { AdminConsoleState } from '../features/admin/useAdminConsole'
 import { hasCovilPermission } from '../features/covil/permissions'
 import { useSoundEffects } from '../features/sound'
-import type { UseVoiceRoomResult } from '../features/voice'
+import type {
+  UseVoiceRoomResult,
+  VoicePresenceByChannel,
+} from '../features/voice'
 import type {
   Channel,
   ChannelKind,
@@ -35,6 +38,7 @@ interface WorkspaceViewProps {
   voice: UseVoiceRoomResult
   isDemo: boolean
   onSelectChannel: (channel: Channel) => void
+  onJoinVoiceChannel?: (channel: Channel) => Promise<void>
   onSendMessage: (content: string) => Promise<void>
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
@@ -51,6 +55,7 @@ interface WorkspaceViewProps {
   onSetMemberRole?: (userId: string, roleId: string, assigned: boolean) => Promise<unknown>
   onRemoveMember?: (userId: string) => Promise<unknown>
   onModerateVoice?: (channelId: string, userId: string, action: VoiceModerationAction) => Promise<unknown>
+  voicePresenceByChannel?: VoicePresenceByChannel
 }
 
 export function WorkspaceView({
@@ -64,6 +69,7 @@ export function WorkspaceView({
   voice,
   isDemo,
   onSelectChannel,
+  onJoinVoiceChannel,
   onSendMessage,
   onSignOut,
   onRefreshInvite,
@@ -80,6 +86,7 @@ export function WorkspaceView({
   onSetMemberRole,
   onRemoveMember,
   onModerateVoice,
+  voicePresenceByChannel = new Map(),
 }: WorkspaceViewProps) {
   const [showMembers, setShowMembers] = useState(
     () => typeof window === 'undefined' || window.innerWidth > 1050,
@@ -94,6 +101,25 @@ export function WorkspaceView({
   const canModerateVoice = hasCovilPermission(currentPermissions, 'moderate_voice')
   const canRemoveMembers = hasCovilPermission(currentPermissions, 'remove_members')
   const canManageCovil = currentUser.role === 'owner' || canRemoveMembers
+  const selectedRoomParticipants =
+    selectedChannel.kind === 'voice'
+      ? voicePresenceByChannel.get(selectedChannel.id) ?? []
+      : []
+  const isCurrentVoiceRoom = selectedChannel.id === voiceChannel.id
+  const viewedVoice: UseVoiceRoomResult =
+    selectedChannel.kind === 'voice' &&
+    (!isCurrentVoiceRoom || voice.status === 'idle')
+      ? {
+          ...voice,
+          error: isCurrentVoiceRoom ? voice.error : null,
+          isScreenSharing: false,
+          localScreenStream: null,
+          participants: selectedRoomParticipants,
+          remotePeers: [],
+          speakingParticipantIds: new Set(),
+          status: selectedRoomParticipants.length > 0 ? 'joined' : 'idle',
+        }
+      : voice
 
   useEffect(() => {
     const lastMessage = messages.at(-1) ?? null
@@ -147,6 +173,7 @@ export function WorkspaceView({
         onToggleSounds={sounds.toggle}
         soundsEnabled={sounds.enabled}
         voiceChannelId={voice.status === 'joined' ? voiceChannel.id : null}
+        voicePresenceByChannel={voicePresenceByChannel}
         voiceStatus={voice.status}
       />
       <div className="workspace">
@@ -164,7 +191,7 @@ export function WorkspaceView({
             isDemo={isDemo}
             onToggleMembers={() => setShowMembers((value) => !value)}
             roomName={selectedChannel.name}
-            voice={voice}
+            voice={viewedVoice}
             members={members}
             roles={roles}
             memberRoleAssignments={memberRoleAssignments}
@@ -172,9 +199,13 @@ export function WorkspaceView({
             canModerate={canModerateVoice}
             onJoin={() => {
               sounds.play('join')
-              return voice.join()
+              return onJoinVoiceChannel
+                ? onJoinVoiceChannel(selectedChannel)
+                : voice.join()
             }}
             onModerate={onModerateVoice ? (userId, action) => onModerateVoice(selectedChannel.id, userId, action) : undefined}
+            isConnectedRoom={isCurrentVoiceRoom && voice.status === 'joined'}
+            isCurrentVoiceRoom={isCurrentVoiceRoom}
           />
         )}
         <VoiceDock

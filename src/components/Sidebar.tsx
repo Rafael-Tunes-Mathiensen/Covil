@@ -13,6 +13,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import { BrandMark } from './BrandMark'
+import type { VoicePresenceByChannel } from '../features/voice'
 import type { Channel, ChannelKind, Covil, Profile } from '../types/domain'
 import { Avatar } from './Avatar'
 
@@ -23,6 +24,7 @@ interface SidebarProps {
   currentUser: Profile
   voiceChannelId: string | null
   voiceStatus: 'idle' | 'joining' | 'joined' | 'leaving'
+  voicePresenceByChannel?: VoicePresenceByChannel
   onSelectChannel: (channel: Channel) => void
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
@@ -44,6 +46,7 @@ export function Sidebar({
   currentUser,
   voiceChannelId,
   voiceStatus,
+  voicePresenceByChannel = new Map(),
   onSelectChannel,
   onSignOut,
   onRefreshInvite,
@@ -128,18 +131,42 @@ export function Sidebar({
         >
           {voiceChannels.map((channel) => {
             const isConnected = voiceStatus === 'joined' && voiceChannelId === channel.id
+            const participants = voicePresenceByChannel.get(channel.id) ?? []
             return (
-              <button
-                className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}`}
-                key={channel.id}
-                aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
-                onClick={() => onSelectChannel(channel)}
-                type="button"
-              >
-                {isConnected ? <Headphones size={18} /> : <Volume2 size={18} />}
-                <span>{channel.name}</span>
-                {isConnected && <i className="channel__live" />}
-              </button>
+              <div className="voice-channel-entry" key={channel.id}>
+                <button
+                  className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}`}
+                  aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
+                  onClick={() => onSelectChannel(channel)}
+                  type="button"
+                >
+                  {isConnected ? <Headphones size={18} /> : <Volume2 size={18} />}
+                  <span>{channel.name}</span>
+                  {participants.length > 0 && (
+                    <small className="channel__count">{participants.length}</small>
+                  )}
+                  {isConnected && <i className="channel__live" />}
+                </button>
+                {participants.length > 0 && (
+                  <div
+                    aria-label={`Participantes em ${channel.name}`}
+                    className="voice-channel-members"
+                    role="list"
+                  >
+                    {participants.map((participant) => (
+                      <span className="voice-channel-member" key={participant.id} role="listitem">
+                        <Avatar
+                          color={participant.id === currentUser.id ? currentUser.avatarColor : '#626b78'}
+                          name={participant.displayName}
+                          size="small"
+                          status="online"
+                        />
+                        <span>{participant.displayName}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             )
           })}
         </ChannelSection>

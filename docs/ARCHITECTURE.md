@@ -44,16 +44,20 @@ Cada participante mantém até cinco `RTCPeerConnection`, uma para cada amigo. E
 
 - permissão e ciclo de vida do microfone;
 - perfect negotiation para evitar colisão de ofertas;
-- candidatos ICE e uma tentativa de ICE restart;
+- candidatos ICE, tolerância breve a desconexão, ICE restart e recriação do peer que continuar falho;
 - reprodução de áudio remoto;
 - publicação e remoção da tela compartilhada;
 - detecção de fala por volume com Web Audio, sem gravar ou enviar amostras de áudio;
 - coleta local de bytes, bitrate, latência, jitter, perda e tipo de rota ICE, sem exibir endereços IP;
 - encerramento de tracks, peers e assinaturas.
 
-O transporte `SupabaseVoiceTransport` usa um canal privado: Broadcast para sinais e Presence para anunciar participantes. Políticas em `realtime.messages` verificam se a pessoa pertence ao Covil correspondente antes de autorizar leitura ou escrita. Os servidores ICE podem ser configurados como URLs STUN/TURN separadas por vírgula ou como um array JSON completo de `RTCIceServer`, inclusive com `username` e `credential`. TURN deve usar credenciais efêmeras; segredos permanentes nunca devem entrar no bundle nem em `/config.js`.
+O transporte `SupabaseVoiceTransport` separa dois tópicos privados. `voice:<channel_uuid>` entrega Broadcast SDP/ICE somente aos participantes conectados à chamada. `voice-presence:<channel_uuid>` mantém o roster: observadores assinam sem `track`, enquanto quem entra publica sua presença. As duas superfícies compartilham uma única assinatura de Presence por sala, republicam o participante após reconexão e têm policies por membership e extensão em `realtime.messages`.
 
-Cada canal de voz usa uma sala independente. Ao selecionar outra sala durante uma chamada, o cliente encerra peers, tracks e assinatura atuais antes de trocar o transporte. O indicador de fala analisa localmente os streams com `AnalyserNode` e RMS; apenas o estado visual transitório permanece em memória.
+Cada entrada recebe um `sessionId`. Sinais de uma sessão anterior são descartados; sinais que chegam antes do snapshot de Presence ficam por no máximo 15 segundos em uma fila limitada a seis emissores e 64 itens por emissor. Cada peer aceita até 128 sinais pendentes e 64 candidatos ICE anteriores à descrição remota. Observadores repetem falhas iniciais com backoff entre 1 e 30 segundos; ações de Presence tentam até três vezes.
+
+Os servidores ICE podem ser configurados como URLs STUN/TURN separadas por vírgula ou como um array JSON completo de `RTCIceServer`, inclusive com `username` e `credential`. O padrão atual usa somente STUN. Recuperação ICE não cria uma rota de relay: redes sem caminho P2P direto precisam de TURN com credenciais efêmeras. Segredos permanentes nunca devem entrar no bundle nem em `/config.js`.
+
+Cada canal de voz usa uma sala independente. Selecionar outra sala apenas mostra seus ocupantes e mantém a chamada atual no dock. A ação **Entrar nesta sala** encerra peers, tracks e assinaturas da chamada anterior antes de iniciar a nova. O indicador de fala analisa localmente os streams com `AnalyserNode` e RMS; apenas o estado visual transitório permanece em memória.
 
 ### Moderação cooperativa
 
@@ -76,7 +80,7 @@ Consulte [SUPABASE.md](./SUPABASE.md) para a matriz de autorização e os passos
 - um Covil ativo por usuário na interface;
 - até 25 canais de texto e voz e 12 cargos por Covil;
 - malha WebRTC para até seis participantes;
-- ausência de SFU e de TURN gerenciado nesta etapa;
+- ausência de SFU e configuração padrão somente com STUN, sem TURN gerenciado nesta etapa;
 - moderação de voz cooperativa, sem garantia contra cliente adulterado;
 - remoção de membro não revoga uma conexão P2P já estabelecida até a sala ser reiniciada;
 - sem upload de arquivos, câmera ou gravação.

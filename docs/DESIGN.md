@@ -6,7 +6,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 
 ## Plano de conteúdo
 
-1. **Navegação:** nome do Covil, canais de texto, salas de voz e ações autorizadas.
+1. **Navegação:** nome do Covil, canais de texto, salas de voz, lista compacta de ocupantes e ações autorizadas.
 2. **Área principal:** conversa ou compartilhamento de tela, nunca os dois disputando atenção.
 3. **Contexto:** participantes e estado de voz em um painel recolhível.
 4. **Ação persistente:** controles essenciais da chamada em uma barra inferior.
@@ -15,6 +15,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 ## Tese de interação
 
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
+- Selecionar uma sala de voz permite inspecionar seus ocupantes sem interromper a chamada mantida no dock; entrar nela é uma ação explícita.
 - O contorno do avatar e uma pequena forma de onda respondem somente enquanto o detector local identifica fala.
 - O compartilhamento de tela expande a área principal e recolhe o contexto secundário.
 - Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.

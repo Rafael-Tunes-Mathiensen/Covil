@@ -31,6 +31,13 @@ const DEFAULT_SCREEN_SHARE_CONSTRAINTS: DisplayMediaStreamOptions = {
 
 const SPEAKING_SAMPLE_INTERVAL_MS = 100
 const SPEAKING_ANALYSER_FFT_SIZE = 256
+const MAX_PENDING_SIGNAL_SENDERS = 6
+const MAX_PENDING_SIGNALS_PER_SENDER = 64
+const MAX_PENDING_CANDIDATES_PER_PEER = 64
+const MAX_QUEUED_SIGNALS_PER_PEER = 128
+const PENDING_SIGNAL_TTL_MS = 15_000
+const ICE_DISCONNECTED_GRACE_MS = 5_000
+const ICE_RESTART_TIMEOUT_MS = 8_000
 
 type ErrorContext =
   | 'microphone'
@@ -52,14 +59,22 @@ interface PeerContext {
   isSettingRemoteAnswerPending: boolean
   pendingCandidates: Array<RTCIceCandidateInit | null>
   signalQueue: Promise<void>
+  queuedSignalCount: number
   audioPlaybackBlocked: boolean
   iceRestartAttempted: boolean
+  recoveryTimerId: number | null
   closed: boolean
   lastStats: {
     capturedAt: number
     bytesSent: number
     bytesReceived: number
   } | null
+}
+
+interface PendingSignalBatch {
+  expiresAt: number
+  sessionId?: string
+  signals: VoiceSignal[]
 }
 
 interface SpeakingMonitor {
@@ -89,9 +104,11 @@ interface ActiveSession {
   screenRequestVersion: number
   participants: Map<string, VoiceParticipant>
   peers: Map<string, PeerContext>
+  pendingSignals: Map<string, PendingSignalBatch>
   speakingActivity: SpeakingActivity | null
   unsubscribers: SignalUnsubscribe[]
   disposed: boolean
+  disconnect: (error: unknown) => void
   reportError: (error: VoiceRoomError) => void
   publishParticipants: () => void
   publishPeers: () => void
@@ -488,6 +505,22 @@ function placeholderParticipant(participantId: string): VoiceParticipant {
   }
 }
 
+function createVoiceSessionId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+function signalMatchesParticipant(
+  signal: VoiceSignal,
+  participant: VoiceParticipant,
+) {
+  return participant.sessionId === undefined
+    ? signal.sessionId === undefined
+    : signal.sessionId === participant.sessionId
+}
+
 function createAudioElement() {
   if (typeof Audio === 'undefined') {
     return null
@@ -573,6 +606,7 @@ function closePeer(session: ActiveSession, participantId: string) {
   peer.closed = true
   removeSpeakingMonitor(session, participantId)
   peer.connection.onconnectionstatechange = null
+  peer.connection.oniceconnectionstatechange = null
   peer.connection.onicecandidate = null
   peer.connection.onnegotiationneeded = null
   peer.connection.ontrack = null
@@ -583,7 +617,62 @@ function closePeer(session: ActiveSession, participantId: string) {
   }
   stopStream(peer.audioStream)
   stopStream(peer.screenStream)
+  if (peer.recoveryTimerId !== null) {
+    window.clearTimeout(peer.recoveryTimerId)
+  }
   session.peers.delete(participantId)
+  session.publishPeers()
+}
+
+function isPeerConnected(peer: PeerContext) {
+  if (
+    peer.connection.connectionState === 'failed' ||
+    peer.connection.connectionState === 'closed' ||
+    peer.connection.iceConnectionState === 'failed' ||
+    peer.connection.iceConnectionState === 'closed'
+  ) {
+    return false
+  }
+  return (
+    peer.connection.connectionState === 'connected' ||
+    peer.connection.iceConnectionState === 'connected' ||
+    peer.connection.iceConnectionState === 'completed'
+  )
+}
+
+function schedulePeerRecovery(
+  session: ActiveSession,
+  peer: PeerContext,
+  delay: number,
+) {
+  if (session.disposed || peer.closed || peer.recoveryTimerId !== null) return
+
+  peer.recoveryTimerId = window.setTimeout(() => {
+    peer.recoveryTimerId = null
+    if (session.disposed || peer.closed) return
+
+    if (isPeerConnected(peer)) {
+      peer.iceRestartAttempted = false
+      return
+    }
+
+    if (!peer.iceRestartAttempted) {
+      peer.iceRestartAttempted = true
+      try {
+        peer.connection.restartIce()
+        schedulePeerRecovery(session, peer, ICE_RESTART_TIMEOUT_MS)
+        return
+      } catch {
+        // A recriacao completa abaixo cobre navegadores que rejeitam restartIce.
+      }
+    }
+
+    const { participantId } = peer
+    closePeer(session, participantId)
+    if (session.participants.has(participantId)) {
+      createPeer(session, participantId)
+    }
+  }, delay)
 }
 
 function createPeer(session: ActiveSession, participantId: string) {
@@ -608,8 +697,10 @@ function createPeer(session: ActiveSession, participantId: string) {
     isSettingRemoteAnswerPending: false,
     pendingCandidates: [],
     signalQueue: Promise.resolve(),
+    queuedSignalCount: 0,
     audioPlaybackBlocked: false,
     iceRestartAttempted: false,
+    recoveryTimerId: null,
     closed: false,
     lastStats: null,
   }
@@ -620,6 +711,7 @@ function createPeer(session: ActiveSession, participantId: string) {
       roomId: session.roomId,
       from: session.localParticipant.id,
       to: participantId,
+      sessionId: session.localParticipant.sessionId,
       candidate: event.candidate?.toJSON() ?? null,
     })
   }
@@ -639,6 +731,7 @@ function createPeer(session: ActiveSession, participantId: string) {
           roomId: session.roomId,
           from: session.localParticipant.id,
           to: participantId,
+          sessionId: session.localParticipant.sessionId,
           description: connection.localDescription.toJSON(),
         })
       }
@@ -679,25 +772,33 @@ function createPeer(session: ActiveSession, participantId: string) {
     session.publishPeers()
   }
 
-  connection.onconnectionstatechange = () => {
+  const handleConnectionStateChange = () => {
     session.publishPeers()
 
-    if (connection.connectionState !== 'failed') {
-      return
-    }
-
-    if (!peer.iceRestartAttempted) {
-      peer.iceRestartAttempted = true
-      try {
-        connection.restartIce()
-      } catch (error) {
-        session.reportError(toVoiceRoomError(error, 'connection'))
+    if (isPeerConnected(peer)) {
+      peer.iceRestartAttempted = false
+      if (peer.recoveryTimerId !== null) {
+        window.clearTimeout(peer.recoveryTimerId)
+        peer.recoveryTimerId = null
       }
       return
     }
 
-    session.reportError(toVoiceRoomError(undefined, 'connection'))
+    if (
+      connection.connectionState === 'failed' ||
+      connection.iceConnectionState === 'failed'
+    ) {
+      schedulePeerRecovery(session, peer, 0)
+    } else if (
+      connection.connectionState === 'disconnected' ||
+      connection.iceConnectionState === 'disconnected'
+    ) {
+      schedulePeerRecovery(session, peer, ICE_DISCONNECTED_GRACE_MS)
+    }
   }
+
+  connection.onconnectionstatechange = handleConnectionStateChange
+  connection.oniceconnectionstatechange = handleConnectionStateChange
 
   session.peers.set(participantId, peer)
 
@@ -761,7 +862,9 @@ async function processSignal(
     }
 
     if (!connection.remoteDescription) {
-      peer.pendingCandidates.push(signal.candidate)
+      if (peer.pendingCandidates.length < MAX_PENDING_CANDIDATES_PER_PEER) {
+        peer.pendingCandidates.push(signal.candidate)
+      }
       return
     }
 
@@ -803,6 +906,7 @@ async function processSignal(
         roomId: session.roomId,
         from: session.localParticipant.id,
         to: peer.participantId,
+        sessionId: session.localParticipant.sessionId,
         description: connection.localDescription.toJSON(),
       })
     }
@@ -821,21 +925,46 @@ function handleSignal(session: ActiveSession, signal: VoiceSignal) {
 
   // Broadcast é autorizado por membership, mas o emissor também precisa estar
   // anunciado na Presence atual para poder abrir uma conexão de mídia.
-  if (!session.participants.has(signal.from)) {
+  const presentParticipant = session.participants.get(signal.from)
+  if (!presentParticipant) {
+    const now = Date.now()
+    for (const [senderId, batch] of session.pendingSignals) {
+      if (batch.expiresAt <= now) session.pendingSignals.delete(senderId)
+    }
+
+    let batch = session.pendingSignals.get(signal.from)
+    if (!batch || batch.sessionId !== signal.sessionId) {
+      if (!batch && session.pendingSignals.size >= MAX_PENDING_SIGNAL_SENDERS) return
+      batch = {
+        expiresAt: now + PENDING_SIGNAL_TTL_MS,
+        sessionId: signal.sessionId,
+        signals: [],
+      }
+      session.pendingSignals.set(signal.from, batch)
+    }
+    if (batch.signals.length < MAX_PENDING_SIGNALS_PER_SENDER) {
+      batch.signals.push(signal)
+    }
     return
   }
+
+  if (!signalMatchesParticipant(signal, presentParticipant)) return
 
   const peer = ensurePeer(session, signal.from)
-  if (!peer) {
+  if (!peer || peer.queuedSignalCount >= MAX_QUEUED_SIGNALS_PER_PEER) {
     return
   }
 
+  peer.queuedSignalCount += 1
   peer.signalQueue = peer.signalQueue
     .then(() => processSignal(session, peer, signal))
     .catch((error) => {
       if (!session.disposed && !peer.closed) {
         session.reportError(toVoiceRoomError(error, 'connection'))
       }
+    })
+    .finally(() => {
+      peer.queuedSignalCount = Math.max(0, peer.queuedSignalCount - 1)
     })
 }
 
@@ -856,16 +985,31 @@ function reconcilePresence(
     }
   }
 
+  const previousParticipants = session.participants
   session.participants = nextParticipants
 
   for (const participantId of session.peers.keys()) {
-    if (!nextParticipants.has(participantId)) {
+    const previous = previousParticipants.get(participantId)
+    const next = nextParticipants.get(participantId)
+    if (!next || previous?.sessionId !== next.sessionId) {
       closePeer(session, participantId)
+      session.pendingSignals.delete(participantId)
     }
   }
 
-  for (const participantId of nextParticipants.keys()) {
+  for (const [participantId, presentParticipant] of nextParticipants) {
     ensurePeer(session, participantId)
+
+    const batch = session.pendingSignals.get(participantId)
+    if (batch) {
+      session.pendingSignals.delete(participantId)
+      if (
+        batch.expiresAt > Date.now() &&
+        batch.signals.every((signal) => signalMatchesParticipant(signal, presentParticipant))
+      ) {
+        batch.signals.forEach((signal) => handleSignal(session, signal))
+      }
+    }
   }
 
   session.publishParticipants()
@@ -899,6 +1043,7 @@ function removeScreenStream(session: ActiveSession) {
       roomId: session.roomId,
       from: session.localParticipant.id,
       to: peer.participantId,
+      sessionId: session.localParticipant.sessionId,
       active: false,
     })
   }
@@ -928,6 +1073,7 @@ async function disposeSession(session: ActiveSession) {
   stopStream(session.localStream)
   session.screenStream = null
   session.participants.clear()
+  session.pendingSignals.clear()
 
   const unsubscribers = session.unsubscribers.splice(0).reverse()
   await Promise.allSettled(
@@ -1048,21 +1194,40 @@ export function useVoiceRoom({
       return
     }
 
+    const localParticipant: VoiceParticipant = {
+      ...participant,
+      sessionId: createVoiceSessionId(),
+    }
     const session: ActiveSession = {
       generation,
       roomId,
-      localParticipant: participant,
+      localParticipant,
       transport,
       rtcConfiguration,
       autoPlayRemoteAudio,
       localStream: microphoneStream,
       screenStream: null,
       screenRequestVersion: 0,
-      participants: new Map([[participant.id, participant]]),
+      participants: new Map([[localParticipant.id, localParticipant]]),
       peers: new Map(),
+      pendingSignals: new Map(),
       speakingActivity: null,
       unsubscribers: [],
       disposed: false,
+      disconnect: (cause) => {
+        if (session.disposed || sessionRef.current !== session) return
+        const disconnectGeneration = ++generationRef.current
+        joiningRef.current = false
+        sessionRef.current = null
+        reportError(toVoiceRoomError(cause, 'signaling'))
+        if (mountedRef.current) setStatus('leaving')
+        void disposeSession(session).finally(() => {
+          if (mountedRef.current && generationRef.current === disconnectGeneration) {
+            resetPublishedState()
+            setStatus('idle')
+          }
+        })
+      },
       reportError,
       publishParticipants: () => {
         if (mountedRef.current && sessionRef.current === session) {
@@ -1113,12 +1278,12 @@ export function useVoiceRoom({
     }
     startSpeakingActivity(session)
     setLocalStream(microphoneStream)
-    setParticipants([participant])
+    setParticipants([localParticipant])
 
     try {
       const unsubscribeSignals = await transport.subscribe({
         roomId,
-        participantId: participant.id,
+        participantId: localParticipant.id,
         onSignal: (signal) => handleSignal(session, signal),
       })
 
@@ -1130,9 +1295,10 @@ export function useVoiceRoom({
 
       const unsubscribePresence = await transport.presence({
         roomId,
-        participant,
+        participant: localParticipant,
         onChange: (presentParticipants) =>
           reconcilePresence(session, presentParticipants),
+        onDisconnect: (cause) => session.disconnect(cause),
       })
 
       if (session.disposed || generation !== generationRef.current) {
