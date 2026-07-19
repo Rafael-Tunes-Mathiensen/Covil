@@ -10,21 +10,26 @@ entre os participantes por WebRTC; eles não são armazenados no banco.
 2. Em **Authentication > URL Configuration**, configure a URL publicada do app e
    os endereços locais usados no desenvolvimento, por exemplo
    `http://localhost:5173`.
-   O cliente usa PKCE; abra o link de confirmação no mesmo navegador que iniciou
-   o cadastro para que o verificador local esteja disponível.
-3. Copie `.env.example` para `.env.local` e preencha:
+   Quando a confirmação de e-mail estiver ativa, abra o link no mesmo navegador
+   que iniciou o cadastro para que o verificador PKCE local esteja disponível.
+3. Para desenvolvimento, copie `.env.example` para `.env.local` e preencha:
 
    ```dotenv
    VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
    VITE_SUPABASE_ANON_KEY=SUA_CHAVE_ANON
    ```
 
-4. Vincule o Supabase CLI e aplique a migration:
+   Na hospedagem, não use o prefixo `VITE_`: configure `SUPABASE_URL` e
+   `SUPABASE_ANON_KEY` no ambiente de execução do Sites. O Worker expõe apenas
+   esses valores públicos ao cliente por `/config.js`.
+4. Vincule o Supabase CLI, revise e aplique a migration:
 
    ```bash
-   supabase login
-   supabase link --project-ref SEU_PROJECT_REF
-   supabase db push
+   npx supabase login
+   npx supabase link --project-ref SEU_PROJECT_REF
+   npx supabase db push --dry-run
+   npx supabase db push
+   npx supabase migration list
    ```
 
 A migration canônica é
@@ -34,6 +39,22 @@ para entrar juntos.
 
 Para um banco local já inicializado pelo Supabase CLI, `supabase db reset`
 reaplica todas as migrations. Esse comando apaga os dados locais existentes.
+
+## Auth para o piloto
+
+O SMTP padrão do Supabase é restrito e não deve ser tratado como serviço de
+entrega para os endereços dos amigos. Para o primeiro grupo de duas a quatro
+pessoas:
+
+1. mantenha cadastro por e-mail habilitado;
+2. deixe a confirmação de e-mail temporariamente desativada;
+3. crie e valide todas as contas do grupo;
+4. desabilite novos cadastros quando todos conseguirem entrar.
+
+Não ative CAPTCHA ainda. O formulário atual não envia `captchaToken`, portanto
+ativar essa exigência no painel bloquearia os cadastros. Antes de abrir o Covil
+para mais pessoas, integre CAPTCHA no frontend, configure SMTP próprio e volte a
+habilitar confirmação de e-mail.
 
 ## Modelo de dados
 
@@ -143,6 +164,11 @@ cria policies em `realtime.messages` que autorizam somente membros do Covil
 correspondente. O transporte atualiza o JWT do Realtime antes de assinar o
 canal. Não grave SDP ou candidatos ICE no histórico do chat.
 
+No painel do Supabase, abra **Realtime > Settings**, mantenha o serviço ativo e
+desative **Allow public access to channels**. Os canais de voz usam
+`private: true`, portanto Broadcast e Presence continuam disponíveis apenas
+para usuários autenticados que passam pelas policies acima.
+
 ## Matriz de autorização
 
 | Ação | Regra de RLS/grant |
@@ -166,20 +192,21 @@ funções `SECURITY DEFINER` têm `search_path` vazio e recebem a identidade de
 
 ## Cuidados operacionais
 
-- Nunca coloque a `service_role` no navegador, no repositório ou em variáveis
-  `VITE_*`. Ela ignora RLS. O frontend usa somente a chave pública `anon` junto
-  ao JWT do usuário.
+- Nunca coloque a `service_role` no navegador, no repositório, em variáveis
+  `VITE_*` ou no ambiente de configuração pública do Sites. Ela ignora RLS. O
+  frontend usa somente a chave pública `anon` junto ao JWT do usuário.
 - O convite tem 128 bits, é visível apenas ao owner e muda após cada entrada.
   Ainda assim, compartilhe-o somente em canais privados; o owner pode invalidar
   o código atual pelo botão de renovação.
 - Excluir o owner exclui seu perfil e, por cascata, os Covils que ele possui.
   Exclusões administrativas de usuários devem ser tratadas como destrutivas.
-- RLS controla autorização, não volume. Para exposição pública, acrescente
-  proteção contra spam/rate limiting antes de ampliar o grupo de usuários.
-- Enquanto o app for apenas para amigos, mantenha o link restrito e habilite
-  confirmação de e-mail e não habilite login anônimo. Antes de divulgar
-  publicamente, configure também a proteção anti-bot oferecida pelo Auth para
-  evitar consumo indevido da cota.
+- RLS controla autorização, não volume. A URL hospedada pode ser pública para que
+  os amigos abram a interface, mas tabelas e RPCs continuam exigindo Auth e as
+  policies limitam os dados aos membros do Covil. Antes de ampliar o grupo de
+  usuários, acrescente proteção contra spam e rate limiting.
+- Para o piloto, siga a sequência da seção **Auth para o piloto** e nunca habilite
+  login anônimo. Só ative CAPTCHA depois que o frontend estiver integrado ao
+  provedor escolhido.
 - Em Postgres Changes, eventos `DELETE` têm limitações de filtragem/RLS porque a
   linha já não existe. O cliente não deve depender do payload antigo completo;
   revalide a lista quando precisar refletir exclusões remotas.

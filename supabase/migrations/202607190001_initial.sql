@@ -443,9 +443,8 @@ alter table public.channels force row level security;
 alter table public.messages enable row level security;
 alter table public.messages force row level security;
 
--- Broadcast e Presence de voz usam canais privados. Somente membros do Covil
--- ao qual o canal pertence podem assinar, publicar sinais e anunciar presenca.
-alter table realtime.messages enable row level security;
+-- Broadcast e Presence de voz usam canais privados. realtime.messages ja vem
+-- com RLS habilitado pelo Supabase; as policies abaixo restringem o topico.
 
 create policy covil_voice_realtime_select
 on realtime.messages

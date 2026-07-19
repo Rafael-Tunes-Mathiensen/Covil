@@ -7,7 +7,7 @@ flowchart LR
     A["Navegador A"] <-->|"Áudio e tela · WebRTC"| B["Navegador B"]
     A <-->|"Áudio e tela · WebRTC"| C["Navegador C"]
     A & B & C <-->|"Auth, chat, presença e sinais"| S["Supabase"]
-    H["Cloudflare Pages"] -->|"PWA estática"| A & B & C
+    H["Sites · Cloudflare Workers"] -->|"PWA e config.js"| A & B & C
 ```
 
 ## Camadas
@@ -19,7 +19,22 @@ flowchart LR
 | `src/features/covil` | Grupo, canais, membros e mensagens |
 | `src/features/voice` | WebRTC e transporte de sinalização |
 | `src/lib` | Configuração, Supabase e funções puras |
+| `worker` | Entrega da SPA e configuração pública em tempo de execução |
 | `supabase/migrations` | Modelo, RPCs, RLS e Realtime |
+
+## Entrega e configuração
+
+O `@cloudflare/vite-plugin` lê `wrangler.jsonc` e gera a PWA em `dist/client` e
+o Worker em `dist/server/index.js`. Recursos comuns são entregues pelo binding
+`ASSETS`, com fallback de SPA para as rotas do frontend. A exceção é
+`/config.js`, gerado dinamicamente e sem cache pelo Worker.
+
+Essa rota transforma `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `ICE_SERVERS` do
+ambiente do Sites em configuração pública para o navegador. No desenvolvimento,
+`src/lib/config.ts` mantém compatibilidade com `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_ANON_KEY` e `VITE_ICE_SERVERS` de `.env.local`. Nenhum desses
+locais é adequado para `service_role`, senha do banco ou outro segredo de
+servidor.
 
 ## Chamada de voz
 
@@ -32,7 +47,7 @@ Cada participante mantém até três `RTCPeerConnection`, uma para cada amigo. E
 - publicação e remoção da tela compartilhada;
 - encerramento de tracks, peers e assinaturas.
 
-O transporte `SupabaseVoiceTransport` usa um canal privado: Broadcast para sinais e Presence para anunciar participantes. Políticas em `realtime.messages` verificam se a pessoa pertence ao Covil correspondente antes de autorizar leitura ou escrita. STUN é configurável por variável de ambiente. TURN deverá usar credenciais efêmeras fornecidas por um backend; segredos permanentes nunca devem entrar no bundle do navegador.
+O transporte `SupabaseVoiceTransport` usa um canal privado: Broadcast para sinais e Presence para anunciar participantes. Políticas em `realtime.messages` verificam se a pessoa pertence ao Covil correspondente antes de autorizar leitura ou escrita. Os servidores ICE podem ser configurados como URLs STUN/TURN separadas por vírgula ou como um array JSON completo de `RTCIceServer`, inclusive com `username` e `credential`. TURN deve usar credenciais efêmeras; segredos permanentes nunca devem entrar no bundle nem em `/config.js`.
 
 ## Dados e autorização
 

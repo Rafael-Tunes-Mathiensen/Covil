@@ -45,7 +45,7 @@ Abra o endereço mostrado pelo Vite. Sem `.env.local`, a interface usa dados loc
 
 1. Copie `.env.example` para `.env.local`.
 2. Preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-3. Execute a migration [`supabase/migrations/202607190001_initial.sql`](supabase/migrations/202607190001_initial.sql) no SQL Editor do Supabase.
+3. Vincule o projeto com o Supabase CLI e aplique as migrations com `npx supabase db push`.
 4. Reinicie `npm run dev`.
 
 ```env
@@ -54,7 +54,14 @@ VITE_SUPABASE_ANON_KEY=sua-chave-publica-anon
 VITE_ICE_SERVERS=stun:stun.l.google.com:19302
 ```
 
-> Não coloque `service_role`, senha do banco ou credenciais TURN permanentes em variáveis `VITE_*`. Tudo que começa com `VITE_` é incluído no bundle público.
+`VITE_ICE_SERVERS` também aceita um array JSON de objetos `RTCIceServer` quando
+for necessário informar `username` e `credential` para TURN. Não coloque
+`service_role`, senha do banco ou credenciais TURN permanentes em variáveis
+`VITE_*`: tudo que começa com `VITE_` é incluído no bundle público.
+
+Na versão hospedada, o Worker entrega a configuração em tempo de execução. As
+variáveis equivalentes no Sites são `SUPABASE_URL`, `SUPABASE_ANON_KEY` e
+`ICE_SERVERS`, sem o prefixo `VITE_`.
 
 ## Como funciona
 
@@ -64,7 +71,7 @@ flowchart LR
     A <-->|"Voz e tela · WebRTC"| C["Amigo C"]
     B <-->|"Voz e tela · WebRTC"| C
     A & B & C <-->|"Login, chat e sinais"| S["Supabase"]
-    P["Cloudflare Pages"] -->|"Entrega a PWA"| A & B & C
+    P["Sites · Cloudflare Workers"] -->|"Entrega a PWA"| A & B & C
 ```
 
 Áudio e vídeo não passam pelo banco. Cada navegador envia sua mídia diretamente aos outros participantes. Essa abordagem reduz custo e é adequada ao limite pequeno do projeto. Algumas redes restritivas ainda exigirão um servidor TURN.
@@ -76,8 +83,10 @@ Leia a [arquitetura completa](docs/ARCHITECTURE.md) para conhecer as fronteiras 
 ```text
 covil/
 ├── .github/workflows/       # integração contínua
+├── .openai/hosting.json     # vínculo com o projeto no Sites
 ├── docs/                    # design, arquitetura e publicação
 ├── public/                  # ícone e recursos estáticos
+├── worker/                  # configuração pública em tempo de execução
 ├── src/
 │   ├── components/          # superfícies da interface
 │   ├── data/                # conteúdo de demonstração
@@ -89,7 +98,8 @@ covil/
 │   ├── lib/                 # configuração e utilitários
 │   ├── styles/              # sistema visual
 │   └── types/               # modelo de domínio
-└── supabase/migrations/     # banco e autorização
+├── supabase/migrations/     # banco e autorização
+└── wrangler.jsonc           # Worker e entrega da SPA
 ```
 
 ## Comandos

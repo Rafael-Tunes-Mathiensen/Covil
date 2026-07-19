@@ -24,3 +24,7 @@ npm-debug.log*
 # Supabase local state
 supabase/.branches/
 supabase/.temp/
+
+# Cloudflare local state and secrets
+.wrangler/
+.dev.vars*
