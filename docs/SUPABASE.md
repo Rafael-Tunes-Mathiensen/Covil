@@ -253,8 +253,11 @@ Ofertas ICE/SDP usam Broadcast no tópico privado `voice:<channel_uuid>`.
 O roster usa Presence em `voice-presence:<channel_uuid>`: observar uma sala não
 publica o usuário como participante, enquanto entrar nela executa `track`. A
 migration cria policies em `realtime.messages` que combinam membership,
-prefixo do tópico e extensão correta. O transporte atualiza o JWT antes de
-assinar e compartilha a assinatura de Presence da sala entre roster e chamada.
+prefixo do tópico e extensão correta. No tópico de roster, a leitura de
+Broadcast também é autorizada porque faz parte do handshake exigido pelo
+Realtime para canais privados; o envio de Broadcast continua bloqueado nesse
+tópico. O transporte atualiza o JWT antes de assinar e compartilha a assinatura
+de Presence da sala entre roster e chamada.
 Não grave SDP ou candidatos ICE no histórico do chat; os detalhes de filas e
 recuperação estão em [ARCHITECTURE.md](./ARCHITECTURE.md#chamada-de-voz).
 
