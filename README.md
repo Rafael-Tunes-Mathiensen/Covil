@@ -4,7 +4,7 @@
   <p><strong>Entre. Fale. Jogue.</strong></p>
   <p>Um espaço privado de voz, mensagens e compartilhamento de tela para grupos pequenos.</p>
 
-  [![Qualidade](https://github.com/AriMathiensen/covil/actions/workflows/ci.yml/badge.svg)](https://github.com/AriMathiensen/covil/actions/workflows/ci.yml)
+  [![Qualidade](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml)
   ![Versão](https://img.shields.io/badge/versão-0.1.0-ff7043)
   ![Licença](https://img.shields.io/badge/licença-MIT-929aa8)
 </div>
@@ -33,7 +33,7 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 Requisitos: Node.js 22 ou superior e npm.
 
 ```bash
-git clone https://github.com/AriMathiensen/covil.git
+git clone https://github.com/Rafael-Tunes-Mathiensen/Covil.git
 cd covil
 npm install
 npm run dev
