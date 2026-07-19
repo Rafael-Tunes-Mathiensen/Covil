@@ -21,7 +21,7 @@ interface e fornecer a configuração pública em tempo de execução.
    ```
 
 5. Crie `.env.local` a partir de `.env.example` e teste localmente.
-6. Para o piloto com duas a quatro pessoas, mantenha novos cadastros habilitados
+6. Para o piloto com até seis pessoas, mantenha novos cadastros habilitados
    e deixe a confirmação de e-mail temporariamente desativada. O SMTP padrão do
    Supabase é restrito e não é apropriado para entregar confirmações aos amigos.
    Crie as contas, confirme o acesso de todos e então desabilite novos cadastros.

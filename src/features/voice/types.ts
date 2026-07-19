@@ -88,6 +88,29 @@ export interface RemoteVoicePeer {
   connectionState: RTCPeerConnectionState
 }
 
+export interface VoicePeerDiagnostics {
+  participantId: string
+  displayName: string
+  connectionState: RTCPeerConnectionState
+  iceConnectionState: RTCIceConnectionState
+  bytesSent: number
+  bytesReceived: number
+  uploadBitsPerSecond: number
+  downloadBitsPerSecond: number
+  roundTripTimeMs: number | null
+  jitterMs: number | null
+  packetsLost: number
+  localCandidateType: RTCIceCandidateType | null
+  remoteCandidateType: RTCIceCandidateType | null
+}
+
+export interface VoiceDiagnostics {
+  capturedAt: string | null
+  sessionBytesSent: number
+  sessionBytesReceived: number
+  peers: readonly VoicePeerDiagnostics[]
+}
+
 export interface UseVoiceRoomOptions {
   roomId: string
   participant: VoiceParticipant
@@ -110,6 +133,7 @@ export interface UseVoiceRoomResult {
   localScreenStream: MediaStream | null
   isMuted: boolean
   isScreenSharing: boolean
+  diagnostics: VoiceDiagnostics
   join: () => Promise<void>
   leave: () => Promise<void>
   setMuted: (muted: boolean) => void

@@ -7,6 +7,7 @@ import {
   LogOut,
   Plus,
   RefreshCw,
+  ShieldCheck,
   Volume2,
 } from 'lucide-react'
 import { BrandMark } from './BrandMark'
@@ -24,6 +25,8 @@ interface SidebarProps {
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
   onRotateInvite?: () => Promise<string>
+  isAppAdmin?: boolean
+  onOpenAdmin?: () => void
 }
 
 export function Sidebar({
@@ -37,6 +40,8 @@ export function Sidebar({
   onSignOut,
   onRefreshInvite,
   onRotateInvite,
+  isAppAdmin,
+  onOpenAdmin,
 }: SidebarProps) {
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [isCopyingInvite, setIsCopyingInvite] = useState(false)
@@ -153,6 +158,11 @@ export function Sidebar({
           <strong>{currentUser.displayName}</strong>
           <small>Disponível</small>
         </span>
+        {isAppAdmin && onOpenAdmin && (
+          <button aria-label="Abrir console do proprietário" className="admin-launch" onClick={onOpenAdmin} title="Console do proprietário" type="button">
+            <ShieldCheck size={17} />
+          </button>
+        )}
         {onSignOut && (
           <button aria-label="Sair da conta" onClick={onSignOut} title="Sair" type="button">
             <LogOut size={17} />

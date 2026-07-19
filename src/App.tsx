@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { useSession } from './features/auth/useSession'
 import { useCovilWorkspace } from './features/covil/useCovilWorkspace'
+import { useAdminConsole } from './features/admin/useAdminConsole'
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
 import { localSignalTransport } from './features/voice/localTransport'
 import { SupabaseVoiceTransport } from './features/voice/supabaseTransport'
@@ -139,6 +140,7 @@ function ConnectedWorkspaceReady({
     transport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
   })
+  const admin = useAdminConsole(supabase!)
 
   return (
     <WorkspaceView
@@ -156,6 +158,7 @@ function ConnectedWorkspaceReady({
       selectedChannel={selectedChannel}
       voice={voice}
       voiceChannel={voiceChannel}
+      admin={admin}
     />
   )
 }

@@ -6,9 +6,10 @@ import { Avatar } from './Avatar'
 interface MembersPanelProps {
   members: Profile[]
   voiceParticipants: readonly VoiceParticipant[]
+  memberLimit: number
 }
 
-export function MembersPanel({ members, voiceParticipants }: MembersPanelProps) {
+export function MembersPanel({ members, voiceParticipants, memberLimit }: MembersPanelProps) {
   const voiceIds = new Set(voiceParticipants.map(({ id }) => id))
   const online = members.filter(({ status }) => status !== 'offline')
   const offline = members.filter(({ status }) => status === 'offline')
@@ -17,7 +18,7 @@ export function MembersPanel({ members, voiceParticipants }: MembersPanelProps) 
     <aside className="members-panel">
       <header>
         <div><span className="live-dot" /><strong>{voiceIds.size || '—'}</strong> na voz</div>
-        <Radio size={17} />
+        <div title="Membros no grupo"><strong>{members.length}/{memberLimit}</strong><Radio size={17} /></div>
       </header>
       <MemberGroup title={`Disponíveis — ${online.length}`} members={online} voiceIds={voiceIds} />
       {offline.length > 0 && <MemberGroup title={`Offline — ${offline.length}`} members={offline} voiceIds={voiceIds} />}

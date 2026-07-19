@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AdminConsole } from '../features/admin/AdminConsole'
+import type { AdminConsoleState } from '../features/admin/useAdminConsole'
 import type { UseVoiceRoomResult } from '../features/voice'
 import type { Channel, ChatMessage, Covil, Profile } from '../types/domain'
 import { ChatPanel } from './ChatPanel'
@@ -22,6 +24,7 @@ interface WorkspaceViewProps {
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
   onRotateInvite?: () => Promise<string>
+  admin?: AdminConsoleState
 }
 
 export function WorkspaceView({
@@ -39,8 +42,10 @@ export function WorkspaceView({
   onSignOut,
   onRefreshInvite,
   onRotateInvite,
+  admin,
 }: WorkspaceViewProps) {
   const [showMembers, setShowMembers] = useState(true)
+  const [showAdmin, setShowAdmin] = useState(false)
 
   return (
     <main className={`app-shell${showMembers ? '' : ' app-shell--members-hidden'}`}>
@@ -53,6 +58,8 @@ export function WorkspaceView({
         onRefreshInvite={onRefreshInvite}
         onRotateInvite={onRotateInvite}
         onSignOut={onSignOut}
+        isAppAdmin={admin?.isAdmin ?? false}
+        onOpenAdmin={() => setShowAdmin(true)}
         voiceChannelId={voice.status === 'joined' ? voiceChannel.id : null}
         voiceStatus={voice.status}
       />
@@ -76,7 +83,10 @@ export function WorkspaceView({
         )}
         <VoiceDock roomName={voiceChannel.name} voice={voice} />
       </div>
-      {showMembers && <MembersPanel members={members} voiceParticipants={voice.participants} />}
+      {showMembers && <MembersPanel memberLimit={6} members={members} voiceParticipants={voice.participants} />}
+      {showAdmin && admin?.isAdmin && (
+        <AdminConsole admin={admin} onClose={() => setShowAdmin(false)} voice={voice} />
+      )}
     </main>
   )
 }

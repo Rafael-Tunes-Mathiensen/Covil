@@ -32,10 +32,10 @@ entre os participantes por WebRTC; eles não são armazenados no banco.
    npx supabase migration list
    ```
 
-A migration canônica é
-`supabase/migrations/202607190001_initial.sql`. Não execute trechos dela
-isoladamente no ambiente remoto: funções, grants e policies foram projetados
-para entrar juntos.
+As migrations canônicas ficam em `supabase/migrations/`: a primeira cria o
+modelo privado e a segunda adiciona o limite de seis membros e o console do
+proprietário. Não execute trechos isolados no ambiente remoto: funções, grants,
+triggers e policies foram projetados para entrar juntos.
 
 Para um banco local já inicializado pelo Supabase CLI, `supabase db reset`
 reaplica todas as migrations. Esse comando apaga os dados locais existentes.
@@ -43,7 +43,7 @@ reaplica todas as migrations. Esse comando apaga os dados locais existentes.
 ## Auth para o piloto
 
 O SMTP padrão do Supabase é restrito e não deve ser tratado como serviço de
-entrega para os endereços dos amigos. Para o primeiro grupo de duas a quatro
+entrega para os endereços dos amigos. Para o primeiro grupo de até seis
 pessoas:
 
 1. mantenha cadastro por e-mail habilitado;
@@ -96,7 +96,20 @@ const { data: covil, error } = await supabase.rpc(
 A associação não é duplicada se o usuário já for membro. Cada código aceita uma
 única entrada: ele é substituído atomicamente no primeiro uso, inclusive quando
 duas tentativas chegam ao mesmo tempo. O código pode ser digitado em maiúsculas
-ou minúsculas.
+ou minúsculas. O banco rejeita uma sétima associação mesmo sob tentativas
+concorrentes.
+
+### Console do proprietário
+
+A conta allowlisted em `private.app_admins` consulta o status por
+`is_app_admin()` e carrega `get_admin_overview()` e `get_admin_access()`. Essas
+RPCs expõem contagens, tamanho do banco, contas e memberships, mas não retornam
+o conteúdo das mensagens. `admin_remove_covil_member()` remove apenas membros
+comuns; o fundador do Covil e a conta proprietária são protegidos.
+
+Adicionar ou trocar um proprietário da aplicação é uma operação administrativa
+de banco e deve ser feita por migration revisada. Nunca implemente essa decisão
+por e-mail, metadado controlado pelo cliente ou botão escondido no frontend.
 
 ### Consultar ou renovar um convite
 
@@ -177,6 +190,7 @@ para usuários autenticados que passam pelas policies acima.
 | Atualizar perfil | Próprio usuário; somente `display_name` e `avatar_url` |
 | Criar Covil | Somente pela RPC `create_covil` autenticada |
 | Entrar em Covil | Somente pela RPC autenticada e com convite válido |
+| Lotação do Covil | Máximo de 6 memberships, garantido por trigger transacional |
 | Consultar/renovar convite | Somente o owner, pelas RPCs dedicadas |
 | Atualizar/excluir Covil | Owner; apenas `name` pode ser atualizado |
 | Sair/remover membro | Membro pode remover a si próprio; owner pode remover membros, nunca o registro owner |
@@ -184,6 +198,8 @@ para usuários autenticados que passam pelas policies acima.
 | Ler mensagem | Membro atual do canal/Covil |
 | Criar/editar/excluir mensagem | Autor autenticado e membro atual; canal deve ser de texto |
 | Sinalizar e anunciar presença na voz | Membro autenticado do Covil associado ao canal privado |
+| Ver console operacional | Somente UUID allowlisted em `private.app_admins`; sem leitura global de mensagens |
+| Remover acesso pelo console | Administrador global pode remover membro comum; fundador e proprietário são protegidos |
 | Acesso anônimo | Nenhum acesso às tabelas ou RPCs |
 
 As tabelas usam `ENABLE ROW LEVEL SECURITY` e `FORCE ROW LEVEL SECURITY`. As

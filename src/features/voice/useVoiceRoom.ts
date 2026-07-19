@@ -6,7 +6,9 @@ import type {
   SignalUnsubscribe,
   UseVoiceRoomOptions,
   UseVoiceRoomResult,
+  VoiceDiagnostics,
   VoiceParticipant,
+  VoicePeerDiagnostics,
   VoiceRoomError,
   VoiceSignal,
 } from './types'
@@ -49,6 +51,11 @@ interface PeerContext {
   audioPlaybackBlocked: boolean
   iceRestartAttempted: boolean
   closed: boolean
+  lastStats: {
+    capturedAt: number
+    bytesSent: number
+    bytesReceived: number
+  } | null
 }
 
 interface ActiveSession {
@@ -69,6 +76,119 @@ interface ActiveSession {
   publishParticipants: () => void
   publishPeers: () => void
   publishLocalScreen: (stream: MediaStream | null) => void
+}
+
+const EMPTY_DIAGNOSTICS: VoiceDiagnostics = {
+  capturedAt: null,
+  sessionBytesSent: 0,
+  sessionBytesReceived: 0,
+  peers: [],
+}
+
+interface RtcStatsRecord {
+  id: string
+  type: string
+  kind?: string
+  mediaType?: string
+  bytesSent?: number
+  bytesReceived?: number
+  packetsLost?: number
+  jitter?: number
+  currentRoundTripTime?: number
+  roundTripTime?: number
+  localCandidateId?: string
+  remoteCandidateId?: string
+  candidateType?: RTCIceCandidateType
+  nominated?: boolean
+  selected?: boolean
+  state?: string
+  isRemote?: boolean
+}
+
+async function collectPeerDiagnostics(
+  session: ActiveSession,
+  peer: PeerContext,
+  capturedAt: number,
+): Promise<VoicePeerDiagnostics> {
+  let bytesSent = 0
+  let bytesReceived = 0
+  let packetsLost = 0
+  let jitterMs: number | null = null
+  let roundTripTimeMs: number | null = null
+  let localCandidateType: RTCIceCandidateType | null = null
+  let remoteCandidateType: RTCIceCandidateType | null = null
+  let selectedLocalCandidateId: string | null = null
+  let selectedRemoteCandidateId: string | null = null
+
+  const reports = new Map<string, RtcStatsRecord>()
+  const stats = await peer.connection.getStats()
+  stats.forEach((rawReport) => {
+    const report = rawReport as unknown as RtcStatsRecord
+    reports.set(report.id, report)
+
+    if (report.type === 'outbound-rtp' && report.isRemote !== true) {
+      bytesSent += report.bytesSent ?? 0
+    }
+    if (report.type === 'inbound-rtp' && report.isRemote !== true) {
+      bytesReceived += report.bytesReceived ?? 0
+      packetsLost += Math.max(0, report.packetsLost ?? 0)
+      if (typeof report.jitter === 'number') jitterMs = report.jitter * 1000
+    }
+    if (report.type === 'remote-inbound-rtp') {
+      packetsLost += Math.max(0, report.packetsLost ?? 0)
+      if (typeof report.roundTripTime === 'number') {
+        roundTripTimeMs = report.roundTripTime * 1000
+      }
+    }
+    if (
+      report.type === 'candidate-pair' &&
+      report.state === 'succeeded' &&
+      (report.nominated === true || report.selected === true)
+    ) {
+      selectedLocalCandidateId = report.localCandidateId ?? null
+      selectedRemoteCandidateId = report.remoteCandidateId ?? null
+      if (typeof report.currentRoundTripTime === 'number') {
+        roundTripTimeMs = report.currentRoundTripTime * 1000
+      }
+    }
+  })
+
+  if (selectedLocalCandidateId) {
+    localCandidateType = reports.get(selectedLocalCandidateId)?.candidateType ?? null
+  }
+  if (selectedRemoteCandidateId) {
+    remoteCandidateType = reports.get(selectedRemoteCandidateId)?.candidateType ?? null
+  }
+
+  const previous = peer.lastStats
+  const elapsedSeconds = previous
+    ? Math.max((capturedAt - previous.capturedAt) / 1000, 0.001)
+    : 0
+  const uploadBitsPerSecond = previous
+    ? Math.max(0, ((bytesSent - previous.bytesSent) * 8) / elapsedSeconds)
+    : 0
+  const downloadBitsPerSecond = previous
+    ? Math.max(0, ((bytesReceived - previous.bytesReceived) * 8) / elapsedSeconds)
+    : 0
+
+  peer.lastStats = { capturedAt, bytesSent, bytesReceived }
+  const participant = session.participants.get(peer.participantId)
+
+  return {
+    participantId: peer.participantId,
+    displayName: participant?.displayName ?? placeholderParticipant(peer.participantId).displayName,
+    connectionState: peer.connection.connectionState,
+    iceConnectionState: peer.connection.iceConnectionState,
+    bytesSent,
+    bytesReceived,
+    uploadBitsPerSecond,
+    downloadBitsPerSecond,
+    roundTripTimeMs,
+    jitterMs,
+    packetsLost,
+    localCandidateType,
+    remoteCandidateType,
+  }
 }
 
 function getErrorName(error: unknown) {
@@ -303,6 +423,7 @@ function createPeer(session: ActiveSession, participantId: string) {
     audioPlaybackBlocked: false,
     iceRestartAttempted: false,
     closed: false,
+    lastStats: null,
   }
 
   connection.onicecandidate = (event) => {
@@ -645,6 +766,7 @@ export function useVoiceRoom({
   const [localScreenStream, setLocalScreenStream] =
     useState<MediaStream | null>(null)
   const [isMuted, setMutedState] = useState(false)
+  const [diagnostics, setDiagnostics] = useState<VoiceDiagnostics>(EMPTY_DIAGNOSTICS)
 
   const mountedRef = useRef(true)
   const generationRef = useRef(0)
@@ -679,6 +801,7 @@ export function useVoiceRoom({
     setLocalStream(null)
     setLocalScreenStream(null)
     setMutedState(false)
+    setDiagnostics(EMPTY_DIAGNOSTICS)
   }, [])
 
   const join = useCallback(async () => {
@@ -967,6 +1090,48 @@ export function useVoiceRoom({
   const clearError = useCallback(() => setError(null), [])
 
   useEffect(() => {
+    if (status !== 'joined') return
+
+    let cancelled = false
+    const collect = async () => {
+      const session = sessionRef.current
+      if (!session || session.disposed) return
+
+      const capturedAt = Date.now()
+      const collectedPeers = await Promise.all(
+        [...session.peers.values()]
+          .filter(({ closed }) => !closed)
+          .map(async (peer) => {
+            try {
+              return await collectPeerDiagnostics(session, peer, capturedAt)
+            } catch {
+              // A conexao pode encerrar enquanto getStats() produz o relatorio.
+              return null
+            }
+          }),
+      )
+      const peers = collectedPeers.filter(
+        (peer): peer is VoicePeerDiagnostics => peer !== null,
+      )
+
+      if (cancelled || !mountedRef.current || sessionRef.current !== session) return
+      setDiagnostics({
+        capturedAt: new Date(capturedAt).toISOString(),
+        sessionBytesSent: peers.reduce((total, peer) => total + peer.bytesSent, 0),
+        sessionBytesReceived: peers.reduce((total, peer) => total + peer.bytesReceived, 0),
+        peers,
+      })
+    }
+
+    void collect()
+    const interval = window.setInterval(() => void collect(), 2500)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [status])
+
+  useEffect(() => {
     mountedRef.current = true
 
     return () => {
@@ -989,6 +1154,7 @@ export function useVoiceRoom({
     localScreenStream,
     isMuted,
     isScreenSharing: localScreenStream !== null,
+    diagnostics,
     join,
     leave,
     setMuted,
