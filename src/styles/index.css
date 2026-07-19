@@ -623,6 +623,14 @@ textarea:focus-visible {
   color: #cdebd9;
 }
 
+.channel__count {
+  min-width: 18px;
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 10px;
+  text-align: center;
+}
+
 .channel__live {
   width: 6px;
   height: 6px;
@@ -631,6 +639,44 @@ textarea:focus-visible {
   background: var(--success);
   box-shadow: 0 0 0 4px rgb(85 201 138 / 10%);
   animation: live-signal 1.8s ease-in-out infinite;
+}
+
+.channel__count + .channel__live {
+  margin-left: 0;
+}
+
+.voice-channel-members {
+  display: grid;
+  gap: 4px;
+  padding: 2px 8px 7px 29px;
+}
+
+.voice-channel-member {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: #747d8b;
+  font-size: 11px;
+  animation: voice-member-in var(--motion-base) var(--ease-out) both;
+}
+
+.voice-channel-member > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-channel-member .avatar--small {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  font-size: 8px;
+}
+
+@keyframes voice-member-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes live-signal {
@@ -1294,6 +1340,10 @@ textarea:focus-visible {
   flex-wrap: wrap;
   justify-content: center;
   gap: clamp(28px, 5vw, 64px);
+}
+
+.voice-grid__join {
+  margin: 36px auto 0;
 }
 
 .voice-person {

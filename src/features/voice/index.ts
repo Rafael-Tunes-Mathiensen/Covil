@@ -1,6 +1,9 @@
 export { useVoiceRoom } from './useVoiceRoom'
+export { useVoiceChannelPresence } from './useVoiceChannelPresence'
+export type { VoicePresenceByChannel } from './useVoiceChannelPresence'
 export type {
   PresenceSubscription,
+  PresenceWatchSubscription,
   RemoteVoicePeer,
   SignalSubscription,
   SignalTransport,

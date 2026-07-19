@@ -106,11 +106,12 @@ Supabase, inclua esse host em `connect-src` antes do deploy.
 
 ## 4. Validar antes de convidar
 
-- crie duas contas em navegadores ou perfis diferentes;
+- crie três contas em navegadores ou perfis diferentes;
 - entre no mesmo Covil usando o código de convite e confirme que ele muda;
 - confirme envio e recebimento de mensagens;
 - permita o microfone e teste entrada/saída da sala;
+- com três contas, deixe duas pessoas em salas diferentes e confirme que a lista de ocupantes aparece sem entrar; depois use **Entrar nesta sala** para trocar explicitamente;
 - compartilhe uma janela em 720p;
 - teste em redes diferentes para descobrir se será necessário TURN.
 
-Sem TURN, algumas combinações de operadora, firewall ou CGNAT podem impedir a mídia mesmo que o chat funcione. Esse é o principal risco de conectividade restante.
+O padrão atual usa somente STUN, que não retransmite mídia. Sem TURN, algumas combinações de operadora, firewall, NAT simétrico ou CGNAT podem manter login, chat e roster funcionando, mas impedir áudio ou tela. Esse é o principal risco de conectividade restante e deve ser resolvido com credenciais TURN efêmeras.

@@ -27,6 +27,8 @@ interface VoiceRoomPanelProps {
   currentUser: Profile
   voice: UseVoiceRoomResult
   isDemo: boolean
+  isConnectedRoom?: boolean
+  isCurrentVoiceRoom?: boolean
   onToggleMembers: () => void
   members?: readonly Profile[]
   roles?: readonly CovilRole[]
@@ -42,6 +44,8 @@ export function VoiceRoomPanel({
   currentUser,
   voice,
   isDemo,
+  isConnectedRoom = false,
+  isCurrentVoiceRoom = true,
   onToggleMembers,
   members = [],
   roles = [],
@@ -75,7 +79,7 @@ export function VoiceRoomPanel({
       <header className="workspace-header">
         <div className="workspace-header__title"><Radio size={19} /><strong>{roomName}</strong></div>
         <div className="workspace-header__meta">
-          {voice.status === 'joined' && <span className="connected-label"><i /> CONECTADO</span>}
+          {isConnectedRoom && voice.status === 'joined' && <span className="connected-label"><i /> CONECTADO</span>}
           {isDemo && <span className="demo-badge">MÍDIA LOCAL</span>}
           <button aria-label="Mostrar participantes" onClick={onToggleMembers} type="button">
             <UsersRound size={19} />
@@ -108,7 +112,11 @@ export function VoiceRoomPanel({
       ) : (
         <div className="voice-grid">
           <header><Radio size={17} /><span>{voice.participants.length} na sala agora</span></header>
-          <div className="voice-grid__people">
+          <div
+            aria-label={`Participantes em ${roomName}`}
+            className="voice-grid__people"
+            role="list"
+          >
             {voice.participants.map((participant, index) => {
               const profile = participant.id === currentUser.id ? currentUser : profiles.get(participant.id)
               const isSpeaking = voice.speakingParticipantIds.has(participant.id)
@@ -117,7 +125,7 @@ export function VoiceRoomPanel({
               const canTarget = canModerate && participant.id !== currentUser.id && profile?.role !== 'owner' && onModerate
 
               return (
-                <article className={`voice-person${isSpeaking ? ' is-speaking' : ''}`} key={participant.id}>
+                <article className={`voice-person${isSpeaking ? ' is-speaking' : ''}`} key={participant.id} role="listitem">
                   <div className="voice-person__avatar">
                     <Avatar
                       color={profile?.avatarColor ?? ['#7a8cff', '#55c98a', '#d58cff'][index % 3]}
@@ -144,9 +152,18 @@ export function VoiceRoomPanel({
               )
             })}
           </div>
+          {!isConnectedRoom && (
+            <button
+              className="primary-button primary-button--compact voice-grid__join"
+              onClick={() => void (onJoin ? onJoin() : voice.join())}
+              type="button"
+            >
+              <Headphones size={18} /><span>Entrar nesta sala</span>
+            </button>
+          )}
         </div>
       )}
-      {voice.error && (
+      {isCurrentVoiceRoom && voice.error && (
         <button
           className="voice-error voice-error--room"
           onClick={() => {

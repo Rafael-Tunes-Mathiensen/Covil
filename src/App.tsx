@@ -7,7 +7,7 @@ import { useAdminConsole } from './features/admin/useAdminConsole'
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
 import { localSignalTransport } from './features/voice/localTransport'
 import { SupabaseVoiceTransport } from './features/voice/supabaseTransport'
-import { useVoiceRoom } from './features/voice'
+import { useVoiceChannelPresence, useVoiceRoom } from './features/voice'
 import { appConfig } from './lib/config'
 import { supabase } from './lib/supabase'
 import { demoChannels, demoCovil, demoMembers, demoMessages } from './data/demo'
@@ -167,9 +167,16 @@ function ConnectedWorkspaceReady({
   onModerateVoice,
 }: ConnectedWorkspaceReadyProps) {
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState(voiceChannel.id)
+  const requestedVoiceChannelIdRef = useRef<string | null>(null)
+  const voiceSwitchRequestRef = useRef(0)
   const activeVoiceChannel =
     channels.find(({ id, kind }) => id === activeVoiceChannelId && kind === 'voice') ?? voiceChannel
   const transport = useMemo(() => new SupabaseVoiceTransport(supabase!, user.id), [user.id])
+  const voiceChannelIds = useMemo(
+    () => channels.filter(({ kind }) => kind === 'voice').map(({ id }) => id),
+    [channels],
+  )
+  const voicePresenceByChannel = useVoiceChannelPresence(voiceChannelIds, transport)
   const voice = useVoiceRoom({
     roomId: activeVoiceChannel.id,
     participant: { id: currentUser.id, displayName: currentUser.displayName },
@@ -179,6 +186,7 @@ function ConnectedWorkspaceReady({
   const admin = useAdminConsole(supabase!)
   const setServerMuted = voice.setServerMuted
   const leaveVoice = voice.leave
+  const joinVoice = voice.join
   const voiceStatus = voice.status
   const handledDisconnectRef = useRef<string | null>(null)
   const currentModeration = voiceModerationStates.find(
@@ -197,10 +205,35 @@ function ConnectedWorkspaceReady({
     if (age >= 0 && age < 15_000) void leaveVoice()
   }, [currentModeration?.disconnectRequestedAt, leaveVoice, voiceStatus])
 
-  async function selectChannel(channel: Channel) {
+  useEffect(() => {
+    const requestedVoiceChannelId = requestedVoiceChannelIdRef.current
+    if (
+      !requestedVoiceChannelId ||
+      requestedVoiceChannelId !== activeVoiceChannel.id ||
+      voiceStatus !== 'idle'
+    ) {
+      return
+    }
+
+    requestedVoiceChannelIdRef.current = null
+    void joinVoice()
+  }, [activeVoiceChannel.id, joinVoice, voiceStatus])
+
+  function selectChannel(channel: Channel) {
     onSelectChannel(channel)
-    if (channel.kind !== 'voice' || channel.id === activeVoiceChannel.id) return
+  }
+
+  async function joinVoiceChannel(channel: Channel) {
+    if (channel.kind !== 'voice') return
+    const requestId = ++voiceSwitchRequestRef.current
+    if (channel.id === activeVoiceChannel.id) {
+      await voice.join()
+      return
+    }
+
     if (voice.status !== 'idle') await voice.leave()
+    if (requestId !== voiceSwitchRequestRef.current) return
+    requestedVoiceChannelIdRef.current = channel.id
     setActiveVoiceChannelId(channel.id)
   }
 
@@ -217,7 +250,8 @@ function ConnectedWorkspaceReady({
       isSubmitting={isSubmitting}
       members={members}
       messages={messages}
-      onSelectChannel={(channel) => void selectChannel(channel)}
+      onSelectChannel={selectChannel}
+      onJoinVoiceChannel={joinVoiceChannel}
       onSendMessage={onSendMessage}
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
@@ -231,6 +265,7 @@ function ConnectedWorkspaceReady({
       selectedChannel={selectedChannel}
       voice={voice}
       voiceChannel={activeVoiceChannel}
+      voicePresenceByChannel={voicePresenceByChannel}
       admin={admin}
     />
   )

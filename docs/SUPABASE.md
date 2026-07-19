@@ -33,10 +33,11 @@ armazenados no banco.
    npx supabase migration list
    ```
 
-As cinco migrations canônicas ficam em `supabase/migrations/`. Elas aplicam, em
+As seis migrations canônicas ficam em `supabase/migrations/`. Elas aplicam, em
 ordem, o modelo privado, o limite de seis membros e console do proprietário, o
 ajuste de métricas, o Realtime do workspace e, na migration 005, cargos, criação
-controlada de canais e moderação cooperativa de voz. Não execute trechos
+controlada de canais e moderação cooperativa de voz. A migration 006 separa os
+tópicos privados de sinalização e Presence. Não execute trechos
 isolados: funções, grants, triggers e policies foram projetados para entrar
 juntos.
 
@@ -242,17 +243,20 @@ grupo fazem o cliente buscar novamente apenas os registros permitidos pelas
 policies RLS. Assim, entradas, remoções e alterações aparecem nos navegadores
 conectados sem recarregar a página.
 
-Remova cada canal Realtime ao trocar de tela ou sair:
+Remova cada canal Realtime quando a assinatura deixar de ser necessária:
 
 ```ts
 await supabase.removeChannel(subscription)
 ```
 
-Presença em sala e ofertas ICE/SDP do WebRTC usam o tópico privado
-`voice:<channel_uuid>` com Broadcast/Presence, nunca `messages`. A migration
-cria policies em `realtime.messages` que autorizam somente membros do Covil
-correspondente. O transporte atualiza o JWT do Realtime antes de assinar o
-canal. Não grave SDP ou candidatos ICE no histórico do chat.
+Ofertas ICE/SDP usam Broadcast no tópico privado `voice:<channel_uuid>`.
+O roster usa Presence em `voice-presence:<channel_uuid>`: observar uma sala não
+publica o usuário como participante, enquanto entrar nela executa `track`. A
+migration cria policies em `realtime.messages` que combinam membership,
+prefixo do tópico e extensão correta. O transporte atualiza o JWT antes de
+assinar e compartilha a assinatura de Presence da sala entre roster e chamada.
+Não grave SDP ou candidatos ICE no histórico do chat; os detalhes de filas e
+recuperação estão em [ARCHITECTURE.md](./ARCHITECTURE.md#chamada-de-voz).
 
 No painel do Supabase, abra **Realtime > Settings**, mantenha o serviço ativo e
 desative **Allow public access to channels**. Os canais de voz usam
@@ -277,7 +281,8 @@ para usuários autenticados que passam pelas policies acima.
 | Criar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis |
 | Ler mensagem | Membro atual do canal/Covil |
 | Criar/editar/excluir mensagem | Autor autenticado e membro atual; canal deve ser de texto |
-| Sinalizar e anunciar presença na voz | Membro autenticado do Covil associado ao canal privado |
+| Observar ou anunciar Presence na voz | Membro autenticado do Covil; somente no tópico `voice-presence:<channel_uuid>` |
+| Publicar ou receber sinais WebRTC | Membro autenticado do Covil; somente no tópico `voice:<channel_uuid>` e enquanto assina a chamada |
 | Moderar voz | Owner ou cargo com `moderate_voice`; fundador protegido; aplicação cooperativa no cliente |
 | Ver console operacional | Somente UUID allowlisted em `private.app_admins`; sem leitura global de mensagens |
 | Remover acesso pelo console | Administrador global pode remover membro comum; fundador e proprietário são protegidos |
@@ -326,8 +331,9 @@ Teste com três membros autenticados e um quarto usuário sem associação:
 6. A cria e atribui a B cargos com `manage_channels` e `moderate_voice`; B cria
    um novo canal e modera C, mas continua sem administrar cargos nem
    moderar o fundador.
-7. Ao trocar de sala durante uma chamada, o cliente encerra a sala anterior antes
-   de entrar na nova; mute e disconnect chegam pelo Realtime ao alvo.
+7. Selecionar outra sala mostra seus ocupantes sem sair da chamada. Ao clicar em
+   **Entrar nesta sala**, o cliente encerra a anterior e conecta à nova; mute e
+   disconnect chegam pelo Realtime ao alvo.
 8. A RPC rejeita o 26º canal e o 13º cargo, inclusive sob concorrência.
 9. B sai pela RPC e deixa de ler mensagens. A pode remover membros comuns, mas
    ninguém altera `owner_id`, `role`, autores ou timestamps pelo cliente.
