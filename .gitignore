@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Builds and test output
+dist/
+coverage/
+
+# Local configuration and secrets
+.env*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+.codex-*
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
