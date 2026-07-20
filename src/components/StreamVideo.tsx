@@ -13,7 +13,8 @@ export function StreamVideo({ stream, muted = false, label }: StreamVideoProps) 
     const video = ref.current
     if (!video) return
     video.srcObject = stream
-    void video.play().catch(() => undefined)
+    const playback = video.play()
+    if (playback) void playback.catch(() => undefined)
     return () => {
       video.srcObject = null
     }

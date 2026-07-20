@@ -15,6 +15,7 @@ import type {
   CovilPermission,
   CovilRole,
   MemberRoleAssignment,
+  MentionNotification,
   Profile,
   VoiceModerationAction,
   VoiceModerationState,
@@ -23,6 +24,7 @@ import { ChatPanel } from './ChatPanel'
 import { CovilSettingsDialog } from './CovilSettingsDialog'
 import { CreateChannelDialog } from './CreateChannelDialog'
 import { MembersPanel } from './MembersPanel'
+import { ProfileDialog } from './ProfileDialog'
 import { Sidebar } from './Sidebar'
 import { VoiceDock } from './VoiceDock'
 import { VoiceRoomPanel } from './VoiceRoomPanel'
@@ -40,6 +42,8 @@ interface WorkspaceViewProps {
   onSelectChannel: (channel: Channel) => void
   onJoinVoiceChannel?: (channel: Channel) => Promise<void>
   onSendMessage: (content: string) => Promise<void>
+  onCreatePoll: (question: string, options: string[]) => Promise<void>
+  onVotePoll: (messageId: string, optionIndex: number) => Promise<void>
   onEditMessage: (messageId: string, content: string) => Promise<void>
   onDeleteMessage: (messageId: string) => Promise<void>
   onSignOut?: () => void
@@ -53,11 +57,18 @@ interface WorkspaceViewProps {
   isSubmitting?: boolean
   onCreateChannel?: (name: string, kind: ChannelKind) => Promise<unknown>
   onCreateRole?: (name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
+  onUpdateRole?: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
   onDeleteRole?: (roleId: string) => Promise<unknown>
   onSetMemberRole?: (userId: string, roleId: string, assigned: boolean) => Promise<unknown>
   onRemoveMember?: (userId: string) => Promise<unknown>
   onModerateVoice?: (channelId: string, userId: string, action: VoiceModerationAction) => Promise<unknown>
   voicePresenceByChannel?: VoicePresenceByChannel
+  mentionNotification?: MentionNotification | null
+  onClearMentionNotification?: () => void
+  onUpdateProfile?: (displayName: string, bio: string) => Promise<unknown>
+  onUploadAvatar?: (file: File) => Promise<unknown>
+  onRemoveAvatar?: () => Promise<unknown>
+  onUpdatePassword?: (password: string) => Promise<unknown>
 }
 
 export function WorkspaceView({
@@ -73,6 +84,8 @@ export function WorkspaceView({
   onSelectChannel,
   onJoinVoiceChannel,
   onSendMessage,
+  onCreatePoll,
+  onVotePoll,
   onEditMessage,
   onDeleteMessage,
   onSignOut,
@@ -86,11 +99,18 @@ export function WorkspaceView({
   isSubmitting = false,
   onCreateChannel,
   onCreateRole,
+  onUpdateRole,
   onDeleteRole,
   onSetMemberRole,
   onRemoveMember,
   onModerateVoice,
   voicePresenceByChannel = new Map(),
+  mentionNotification = null,
+  onClearMentionNotification,
+  onUpdateProfile,
+  onUploadAvatar,
+  onRemoveAvatar,
+  onUpdatePassword,
 }: WorkspaceViewProps) {
   const [showMembers, setShowMembers] = useState(
     () => typeof window === 'undefined' || window.innerWidth > 1050,
@@ -98,6 +118,7 @@ export function WorkspaceView({
   const [showAdmin, setShowAdmin] = useState(false)
   const [showCovilSettings, setShowCovilSettings] = useState(false)
   const [createChannelKind, setCreateChannelKind] = useState<ChannelKind | null>(null)
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const sounds = useSoundEffects()
   const previousMessageRef = useRef<{ channelId: string; messageIds: Set<string> } | null>(null)
   const previousVoiceIdsRef = useRef<Set<string> | null>(null)
@@ -105,6 +126,9 @@ export function WorkspaceView({
   const canModerateVoice = hasCovilPermission(currentPermissions, 'moderate_voice')
   const canRemoveMembers = hasCovilPermission(currentPermissions, 'remove_members')
   const canManageCovil = currentUser.role === 'owner' || canRemoveMembers
+  const selectedProfile = selectedProfileId === currentUser.id
+    ? currentUser
+    : members.find(({ id }) => id === selectedProfileId)
   const selectedRoomParticipants =
     selectedChannel.kind === 'voice'
       ? voicePresenceByChannel.get(selectedChannel.id) ?? []
@@ -140,6 +164,10 @@ export function WorkspaceView({
   }, [currentUser.id, messages, selectedChannel.id, sounds])
 
   useEffect(() => {
+    if (mentionNotification) sounds.play('mention')
+  }, [mentionNotification, sounds])
+
+  useEffect(() => {
     if (voice.status !== 'joined') {
       previousVoiceIdsRef.current = null
       return
@@ -171,6 +199,7 @@ export function WorkspaceView({
         canManageCovil={canManageCovil && Boolean(onRemoveMember)}
         onCreateChannel={onCreateChannel ? setCreateChannelKind : undefined}
         onOpenCovilSettings={() => setShowCovilSettings(true)}
+        onOpenProfile={() => setSelectedProfileId(currentUser.id)}
         onToggleSounds={sounds.toggle}
         soundsEnabled={sounds.enabled}
         voiceChannelId={voice.status === 'joined' ? voiceChannel.id : null}
@@ -188,6 +217,9 @@ export function WorkspaceView({
             messages={messages}
             onDelete={onDeleteMessage}
             onEdit={onEditMessage}
+            onCreatePoll={onCreatePoll}
+            onVotePoll={onVotePoll}
+            onOpenProfile={(profile) => setSelectedProfileId(profile.id)}
             onSend={onSendMessage}
             onToggleMembers={() => setShowMembers((value) => !value)}
             roles={roles}
@@ -211,6 +243,7 @@ export function WorkspaceView({
                 : voice.join()
             }}
             onModerate={onModerateVoice ? (userId, action) => onModerateVoice(selectedChannel.id, userId, action) : undefined}
+            onOpenProfile={(profile) => setSelectedProfileId(profile.id)}
             isConnectedRoom={isCurrentVoiceRoom && voice.status === 'joined'}
             isCurrentVoiceRoom={isCurrentVoiceRoom}
           />
@@ -235,10 +268,14 @@ export function WorkspaceView({
       {showMembers && (
         <MembersPanel
           assignments={memberRoleAssignments}
+          canModerate={canModerateVoice}
+          currentUserId={currentUser.id}
           memberLimit={6}
           members={members}
           moderationStates={voiceModerationStates.filter(({ channelId }) => channelId === voiceChannel.id)}
           roles={roles}
+          onModerate={onModerateVoice ? (userId, action) => onModerateVoice(voiceChannel.id, userId, action) : undefined}
+          onOpenProfile={(profile) => setSelectedProfileId(profile.id)}
           speakingParticipantIds={voice.speakingParticipantIds}
           voiceParticipants={voice.participants}
         />
@@ -254,7 +291,7 @@ export function WorkspaceView({
           onCreate={onCreateChannel}
         />
       )}
-      {showCovilSettings && onCreateRole && onDeleteRole && onSetMemberRole && onRemoveMember && (
+      {showCovilSettings && onCreateRole && onUpdateRole && onDeleteRole && onSetMemberRole && onRemoveMember && (
         <CovilSettingsDialog
           assignments={memberRoleAssignments}
           canRemoveMembers={canRemoveMembers}
@@ -263,11 +300,40 @@ export function WorkspaceView({
           members={members}
           onClose={() => setShowCovilSettings(false)}
           onCreateRole={onCreateRole}
+          onUpdateRole={onUpdateRole}
           onDeleteRole={onDeleteRole}
           onRemoveMember={onRemoveMember}
           onSetMemberRole={onSetMemberRole}
           roles={roles}
         />
+      )}
+      {selectedProfile && (
+        <ProfileDialog
+          currentUserId={currentUser.id}
+          isSubmitting={isSubmitting}
+          onClose={() => setSelectedProfileId(null)}
+          onRemoveAvatar={onRemoveAvatar}
+          onUpdatePassword={onUpdatePassword}
+          onUpdateProfile={onUpdateProfile}
+          onUploadAvatar={onUploadAvatar}
+          profile={selectedProfile}
+        />
+      )}
+      {mentionNotification && (
+        <aside className="mention-toast" role="status">
+          <button
+            onClick={() => {
+              const target = channels.find(({ id }) => id === mentionNotification.channelId)
+              if (target) onSelectChannel(target)
+              onClearMentionNotification?.()
+            }}
+            type="button"
+          >
+            <strong>@ Você foi mencionado</strong>
+            <span>{mentionNotification.authorName}: {mentionNotification.content}</span>
+          </button>
+          <button aria-label="Fechar notificação" onClick={onClearMentionNotification} type="button">×</button>
+        </aside>
       )}
     </main>
   )

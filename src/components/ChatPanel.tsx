@@ -6,8 +6,21 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { AtSign, Check, Hash, Pencil, Send, Trash2, UsersRound, X } from 'lucide-react'
+import {
+  AtSign,
+  BarChart3,
+  Check,
+  Dices,
+  Hash,
+  Pencil,
+  RotateCw,
+  Send,
+  Trash2,
+  UsersRound,
+  X,
+} from 'lucide-react'
 import { Avatar } from './Avatar'
+import { ChatCommandDialog, type ChatCommand } from './ChatCommandDialog'
 import { formatMessageDate, formatMessageTime, normalizeMessage } from '../lib/formatters'
 import type {
   Channel,
@@ -27,14 +40,47 @@ interface ChatPanelProps {
   isDemo: boolean
   onDelete: (messageId: string) => Promise<void>
   onEdit: (messageId: string, content: string) => Promise<void>
+  onCreatePoll: (question: string, options: string[]) => Promise<void>
+  onOpenProfile?: (profile: Profile) => void
   onSend: (content: string) => Promise<void>
   onToggleMembers: () => void
+  onVotePoll: (messageId: string, optionIndex: number) => Promise<void>
 }
 
 interface MentionContext {
   start: number
   query: string
 }
+
+const chatCommands: Array<{
+  command: ChatCommand
+  label: string
+  aliases: string[]
+  description: string
+  icon: typeof BarChart3
+}> = [
+  {
+    command: 'poll',
+    label: 'votação',
+    aliases: ['votacao', 'poll'],
+    description: 'Criar uma votação interativa.',
+    icon: BarChart3,
+  },
+  {
+    command: 'roulette',
+    label: 'roleta',
+    aliases: ['roletar', 'roulette'],
+    description: 'Adicionar opções e girar uma roleta.',
+    icon: RotateCw,
+  },
+  {
+    command: 'dice',
+    label: 'dado',
+    aliases: ['dice', 'rolar'],
+    description: 'Sortear um número dentro de um intervalo.',
+    icon: Dices,
+  },
+]
 
 export function ChatPanel({
   channel,
@@ -46,13 +92,19 @@ export function ChatPanel({
   isDemo,
   onDelete,
   onEdit,
+  onCreatePoll,
+  onOpenProfile,
   onSend,
   onToggleMembers,
+  onVotePoll,
 }: ChatPanelProps) {
   const [draft, setDraft] = useState('')
   const [cursorPosition, setCursorPosition] = useState(0)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const [mentionDismissed, setMentionDismissed] = useState(false)
+  const [activeCommandIndex, setActiveCommandIndex] = useState(0)
+  const [commandDismissed, setCommandDismissed] = useState(false)
+  const [activeCommand, setActiveCommand] = useState<ChatCommand | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -84,6 +136,13 @@ export function ChatPanel({
       .slice(0, 6)
   }, [members, mentionContext, mentionDismissed])
   const selectedMentionIndex = Math.min(activeMentionIndex, Math.max(mentionOptions.length - 1, 0))
+  const slashQuery = getSlashQuery(draft, cursorPosition)
+  const commandOptions = slashQuery === null || commandDismissed
+    ? []
+    : chatCommands.filter(({ label, aliases }) => (
+        label.includes(slashQuery) || aliases.some((alias) => alias.includes(slashQuery))
+      ))
+  const selectedCommandIndex = Math.min(activeCommandIndex, Math.max(commandOptions.length - 1, 0))
 
   useEffect(() => {
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -152,10 +211,39 @@ export function ChatPanel({
       }
     }
 
+    if (commandOptions.length > 0) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const direction = event.key === 'ArrowDown' ? 1 : -1
+        setActiveCommandIndex((current) => (
+          current + direction + commandOptions.length
+        ) % commandOptions.length)
+        return
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
+        openCommand(commandOptions[selectedCommandIndex].command)
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setCommandDismissed(true)
+        return
+      }
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       void submit()
     }
+  }
+
+  function openCommand(command: ChatCommand) {
+    setDraft('')
+    setCursorPosition(0)
+    setCommandDismissed(false)
+    setActiveCommandIndex(0)
+    setActiveCommand(command)
   }
 
   function insertMention(member: Profile) {
@@ -226,6 +314,7 @@ export function ChatPanel({
   }
 
   return (
+    <>
     <section className="workspace-panel chat-panel">
       <header className="workspace-header">
         <div className="workspace-header__title"><Hash size={20} /><strong>{channel.name}</strong></div>
@@ -265,6 +354,7 @@ export function ChatPanel({
               {!isGrouped && (
                 <Avatar
                   color={message.author.avatarColor}
+                  imageUrl={message.author.avatarUrl}
                   name={message.author.displayName}
                   size="medium"
                 />
@@ -272,7 +362,13 @@ export function ChatPanel({
               <div className="message__body">
                 {!isGrouped && (
                   <header>
-                    <strong>{message.author.displayName}</strong>
+                    <button
+                      className="message__author"
+                      onClick={() => onOpenProfile?.(message.author)}
+                      type="button"
+                    >
+                      {message.author.displayName}
+                    </button>
                     {authorRole && (
                       <span className="message__role" style={{ '--role-color': authorRole.color } as React.CSSProperties}>
                         <i />{authorRole.name}
@@ -304,6 +400,12 @@ export function ChatPanel({
                       <button aria-label="Cancelar edição" onClick={() => setEditingMessageId(null)} type="button"><X size={15} /></button>
                     </div>
                   </form>
+                ) : message.kind === 'poll' && message.poll ? (
+                  <PollMessage
+                    currentUserId={currentUserId}
+                    message={message}
+                    onVote={onVotePoll}
+                  />
                 ) : (
                   <p>
                     <MessageContent content={message.content} currentUserId={currentUserId} members={members} />
@@ -334,6 +436,25 @@ export function ChatPanel({
       </div>
 
       <form className="composer" onSubmit={handleSubmit}>
+        {commandOptions.length > 0 && (
+          <div className="slash-menu" id="slash-options" role="listbox" aria-label="Comandos do chat">
+            <header><span>/</span> Comandos</header>
+            {commandOptions.map((option, index) => (
+              <button
+                aria-selected={selectedCommandIndex === index}
+                className={selectedCommandIndex === index ? 'is-active' : ''}
+                id={`slash-option-${option.command}`}
+                key={option.command}
+                onClick={() => openCommand(option.command)}
+                role="option"
+                type="button"
+              >
+                <option.icon size={17} />
+                <span><strong>/{option.label}</strong><small>{option.description}</small></span>
+              </button>
+            ))}
+          </div>
+        )}
         {mentionOptions.length > 0 && (
           <div className="mention-menu" id="mention-options" role="listbox" aria-label="Mencionar membro">
             <header><AtSign size={14} /> Marcar alguém</header>
@@ -348,16 +469,22 @@ export function ChatPanel({
                 role="option"
                 type="button"
               >
-                <Avatar color={member.avatarColor} name={member.displayName} size="small" />
+                <Avatar color={member.avatarColor} imageUrl={member.avatarUrl} name={member.displayName} size="small" />
                 <span>{member.displayName}</span>
               </button>
             ))}
           </div>
         )}
         <textarea
-          aria-activedescendant={mentionOptions.length > 0 ? `mention-option-${mentionOptions[selectedMentionIndex].id}` : undefined}
-          aria-controls={mentionOptions.length > 0 ? 'mention-options' : undefined}
-          aria-expanded={mentionOptions.length > 0}
+          aria-activedescendant={
+            mentionOptions.length > 0
+              ? `mention-option-${mentionOptions[selectedMentionIndex].id}`
+              : commandOptions.length > 0
+                ? `slash-option-${commandOptions[selectedCommandIndex].command}`
+                : undefined
+          }
+          aria-controls={mentionOptions.length > 0 ? 'mention-options' : commandOptions.length > 0 ? 'slash-options' : undefined}
+          aria-expanded={mentionOptions.length > 0 || commandOptions.length > 0}
           aria-label={`Mensagem em ${channel.name}`}
           disabled={isSending}
           maxLength={2_000}
@@ -366,6 +493,8 @@ export function ChatPanel({
             setCursorPosition(event.target.selectionStart)
             setActiveMentionIndex(0)
             setMentionDismissed(false)
+            setActiveCommandIndex(0)
+            setCommandDismissed(false)
           }}
           onClick={(event) => setCursorPosition(event.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
@@ -381,6 +510,74 @@ export function ChatPanel({
         {error && <p className="composer__error">{error}</p>}
       </form>
     </section>
+    {activeCommand && (
+      <ChatCommandDialog
+        command={activeCommand}
+        onClose={() => setActiveCommand(null)}
+        onCreatePoll={onCreatePoll}
+        onSendResult={onSend}
+      />
+    )}
+    </>
+  )
+}
+
+function PollMessage({
+  currentUserId,
+  message,
+  onVote,
+}: {
+  currentUserId: string
+  message: ChatMessage
+  onVote: (messageId: string, optionIndex: number) => Promise<void>
+}) {
+  const [busyOption, setBusyOption] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const poll = message.poll!
+  const totalVotes = poll.votes.length
+  const currentVote = poll.votes.find(({ userId }) => userId === currentUserId)?.optionIndex
+
+  async function vote(optionIndex: number) {
+    if (busyOption !== null) return
+    setBusyOption(optionIndex)
+    setError(null)
+    try {
+      await onVote(message.id, optionIndex)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível registrar o voto.')
+    } finally {
+      setBusyOption(null)
+    }
+  }
+
+  return (
+    <div className="poll-message">
+      <header><BarChart3 size={16} /><strong>{message.content}</strong></header>
+      <div className="poll-options">
+        {poll.options.map((option, optionIndex) => {
+          const votes = poll.votes.filter((vote) => vote.optionIndex === optionIndex).length
+          const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
+          const isSelected = currentVote === optionIndex
+          return (
+            <button
+              aria-pressed={isSelected}
+              className={isSelected ? 'is-selected' : ''}
+              disabled={busyOption !== null}
+              key={`${option}-${optionIndex}`}
+              onClick={() => void vote(optionIndex)}
+              type="button"
+            >
+              <i style={{ '--poll-progress': `${percentage}%` } as React.CSSProperties} />
+              <span>{option}</span>
+              <small>{votes} {votes === 1 ? 'voto' : 'votos'} · {percentage}%</small>
+              {isSelected && <Check size={14} />}
+            </button>
+          )
+        })}
+      </div>
+      <footer>{totalVotes} {totalVotes === 1 ? 'pessoa votou' : 'pessoas votaram'} · você pode trocar seu voto</footer>
+      {error && <small className="message__error" role="alert">{error}</small>}
+    </div>
   )
 }
 
@@ -390,6 +587,12 @@ function getMentionContext(content: string, cursorPosition: number): MentionCont
   if (!match) return null
   const start = beforeCursor.lastIndexOf('@')
   return start >= 0 ? { start, query: match[1] } : null
+}
+
+function getSlashQuery(content: string, cursorPosition: number) {
+  const beforeCursor = content.slice(0, cursorPosition)
+  const match = beforeCursor.match(/^\/([^\s/]*)$/u)
+  return match ? match[1].toLocaleLowerCase('pt-BR') : null
 }
 
 function MessageContent({

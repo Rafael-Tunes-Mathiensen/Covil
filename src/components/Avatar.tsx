@@ -3,6 +3,7 @@ import { getInitials } from '../lib/formatters'
 interface AvatarProps {
   name: string
   color: string
+  imageUrl?: string
   size?: 'small' | 'medium' | 'large'
   status?: 'online' | 'away' | 'offline'
   speaking?: boolean
@@ -11,6 +12,7 @@ interface AvatarProps {
 export function Avatar({
   name,
   color,
+  imageUrl,
   size = 'medium',
   status,
   speaking = false,
@@ -22,7 +24,7 @@ export function Avatar({
       className={`avatar avatar--${size} ${palette}${speaking ? ' avatar--speaking' : ''}`}
       title={name}
     >
-      <span>{getInitials(name)}</span>
+      {imageUrl ? <img alt="" src={imageUrl} /> : <span>{getInitials(name)}</span>}
       {status && <i className={`avatar__status avatar__status--${status}`} />}
     </span>
   )

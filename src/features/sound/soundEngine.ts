@@ -4,6 +4,7 @@ export type SoundEvent =
   | 'mute'
   | 'unmute'
   | 'message'
+  | 'mention'
   | 'memberJoin'
   | 'memberLeave'
   | 'share'
@@ -38,6 +39,11 @@ const CUES: Record<SoundEvent, readonly Tone[]> = {
   message: [
     { frequency: 740, endFrequency: 820, duration: 0.1, gain: 0.2 },
     { frequency: 1_046, delay: 0.055, duration: 0.11, gain: 0.14 },
+  ],
+  mention: [
+    { frequency: 660, endFrequency: 740, duration: 0.11, gain: 0.22 },
+    { frequency: 880, delay: 0.065, duration: 0.13, gain: 0.19 },
+    { frequency: 1_174, delay: 0.13, duration: 0.15, gain: 0.14 },
   ],
   memberJoin: [
     { frequency: 330, endFrequency: 392, duration: 0.12, gain: 0.2 },

@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VoiceRoomPanel } from './VoiceRoomPanel'
 import type { UseVoiceRoomResult } from '../features/voice'
@@ -69,5 +69,37 @@ describe('VoiceRoomPanel', () => {
     expect(signal?.nextElementSibling).toBe(nameLine)
     expect(nameLine).toHaveTextContent('Nina')
     expect(nameLine).toHaveTextContent('Raider')
+  })
+
+  it('mantém participantes e oferece alternância de foco durante a transmissão', () => {
+    const screenStream = { getAudioTracks: () => [] } as unknown as MediaStream
+    const voice = {
+      error: null,
+      isScreenSharing: true,
+      localScreenStream: screenStream,
+      participants: [{ id: owner.id, displayName: owner.displayName }, { id: member.id, displayName: member.displayName }],
+      remotePeers: [],
+      speakingParticipantIds: new Set<string>(),
+      status: 'joined',
+      join: vi.fn(async () => undefined),
+    } as unknown as UseVoiceRoomResult
+
+    const { container } = render(
+      <VoiceRoomPanel
+        currentUser={owner}
+        isConnectedRoom
+        isDemo={false}
+        members={[owner, member]}
+        onToggleMembers={vi.fn()}
+        roomName="Lobby"
+        voice={voice}
+      />,
+    )
+
+    expect(screen.getByText(/não forneceu áudio/i)).toBeInTheDocument()
+    expect(screen.getByText('Nina')).toBeInTheDocument()
+    expect(container.querySelector('.screen-layout')).toHaveClass('is-screen-focused')
+    fireEvent.click(screen.getByRole('button', { name: /Ver pessoas/ }))
+    expect(container.querySelector('.screen-layout')).toHaveClass('is-people-focused')
   })
 })

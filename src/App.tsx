@@ -31,7 +31,7 @@ function DemoWorkspace() {
   const currentUser = demoMembers[0]
   const voice = useVoiceRoom({
     roomId: voiceChannel.id,
-    participant: { id: currentUser.id, displayName: currentUser.displayName },
+    participant: { id: currentUser.id, displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl },
     transport: localSignalTransport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
   })
@@ -60,6 +60,25 @@ function DemoWorkspace() {
     setMessages((current) => current.filter(({ id }) => id !== messageId))
   }
 
+  async function createPoll(question: string, options: string[]) {
+    setMessages((current) => [...current, {
+      id: crypto.randomUUID(),
+      channelId: selectedChannel.id,
+      authorId: currentUser.id,
+      content: question,
+      createdAt: new Date().toISOString(),
+      author: currentUser,
+      kind: 'poll',
+      poll: { options, votes: [] },
+    }])
+  }
+
+  async function votePoll(messageId: string, optionIndex: number) {
+    setMessages((current) => current.map((message) => message.id === messageId && message.poll
+      ? { ...message, poll: { ...message.poll, votes: [{ userId: currentUser.id, optionIndex }] } }
+      : message))
+  }
+
   return (
     <WorkspaceView
       channels={demoChannels}
@@ -69,6 +88,8 @@ function DemoWorkspace() {
       members={demoMembers}
       messages={messages.filter(({ channelId }) => channelId === selectedChannel.id)}
       onDeleteMessage={deleteMessage}
+      onCreatePoll={createPoll}
+      onVotePoll={votePoll}
       onEditMessage={editMessage}
       onSelectChannel={setSelectedChannel}
       onSendMessage={sendMessage}
@@ -111,6 +132,8 @@ function ConnectedWorkspace({ user }: { user: User }) {
       onSendMessage={workspace.sendMessage}
       onEditMessage={workspace.editMessage}
       onDeleteMessage={workspace.deleteMessage}
+      onCreatePoll={workspace.createPoll}
+      onVotePoll={workspace.votePoll}
       onRefreshInvite={workspace.refreshInvite}
       onRotateInvite={workspace.rotateInvite}
       currentPermissions={workspace.currentPermissions}
@@ -120,10 +143,17 @@ function ConnectedWorkspace({ user }: { user: User }) {
       isSubmitting={workspace.isSubmitting}
       onCreateChannel={workspace.createChannel}
       onCreateRole={workspace.createRole}
+      onUpdateRole={workspace.updateRole}
       onDeleteRole={workspace.deleteRole}
       onSetMemberRole={workspace.setMemberRole}
       onRemoveMember={workspace.removeMember}
       onModerateVoice={workspace.moderateVoice}
+      mentionNotification={workspace.mentionNotification}
+      onClearMentionNotification={workspace.clearMentionNotification}
+      onUpdateProfile={workspace.updateProfile}
+      onUploadAvatar={workspace.uploadAvatar}
+      onRemoveAvatar={workspace.removeAvatar}
+      onUpdatePassword={workspace.updatePassword}
       selectedChannel={workspace.selectedChannel}
       user={user}
       voiceChannel={voiceChannel}
@@ -144,6 +174,8 @@ interface ConnectedWorkspaceReadyProps {
   onSendMessage: (content: string) => Promise<void>
   onEditMessage: (messageId: string, content: string) => Promise<void>
   onDeleteMessage: (messageId: string) => Promise<void>
+  onCreatePoll: ReturnType<typeof useCovilWorkspace>['createPoll']
+  onVotePoll: ReturnType<typeof useCovilWorkspace>['votePoll']
   onRefreshInvite: () => Promise<string>
   onRotateInvite: () => Promise<string>
   currentPermissions: ReturnType<typeof useCovilWorkspace>['currentPermissions']
@@ -153,10 +185,17 @@ interface ConnectedWorkspaceReadyProps {
   isSubmitting: boolean
   onCreateChannel: ReturnType<typeof useCovilWorkspace>['createChannel']
   onCreateRole: ReturnType<typeof useCovilWorkspace>['createRole']
+  onUpdateRole: ReturnType<typeof useCovilWorkspace>['updateRole']
   onDeleteRole: ReturnType<typeof useCovilWorkspace>['deleteRole']
   onSetMemberRole: ReturnType<typeof useCovilWorkspace>['setMemberRole']
   onRemoveMember: ReturnType<typeof useCovilWorkspace>['removeMember']
   onModerateVoice: ReturnType<typeof useCovilWorkspace>['moderateVoice']
+  mentionNotification: ReturnType<typeof useCovilWorkspace>['mentionNotification']
+  onClearMentionNotification: ReturnType<typeof useCovilWorkspace>['clearMentionNotification']
+  onUpdateProfile: ReturnType<typeof useCovilWorkspace>['updateProfile']
+  onUploadAvatar: ReturnType<typeof useCovilWorkspace>['uploadAvatar']
+  onRemoveAvatar: ReturnType<typeof useCovilWorkspace>['removeAvatar']
+  onUpdatePassword: ReturnType<typeof useCovilWorkspace>['updatePassword']
 }
 
 function ConnectedWorkspaceReady({
@@ -172,6 +211,8 @@ function ConnectedWorkspaceReady({
   onSendMessage,
   onEditMessage,
   onDeleteMessage,
+  onCreatePoll,
+  onVotePoll,
   onRefreshInvite,
   onRotateInvite,
   currentPermissions,
@@ -181,10 +222,17 @@ function ConnectedWorkspaceReady({
   isSubmitting,
   onCreateChannel,
   onCreateRole,
+  onUpdateRole,
   onDeleteRole,
   onSetMemberRole,
   onRemoveMember,
   onModerateVoice,
+  mentionNotification,
+  onClearMentionNotification,
+  onUpdateProfile,
+  onUploadAvatar,
+  onRemoveAvatar,
+  onUpdatePassword,
 }: ConnectedWorkspaceReadyProps) {
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState(voiceChannel.id)
   const requestedVoiceChannelIdRef = useRef<string | null>(null)
@@ -199,7 +247,7 @@ function ConnectedWorkspaceReady({
   const voicePresenceByChannel = useVoiceChannelPresence(voiceChannelIds, transport)
   const voice = useVoiceRoom({
     roomId: activeVoiceChannel.id,
-    participant: { id: currentUser.id, displayName: currentUser.displayName },
+    participant: { id: currentUser.id, displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl },
     transport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
   })
@@ -275,14 +323,23 @@ function ConnectedWorkspaceReady({
       onSendMessage={onSendMessage}
       onEditMessage={onEditMessage}
       onDeleteMessage={onDeleteMessage}
+      onCreatePoll={onCreatePoll}
+      onVotePoll={onVotePoll}
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
       onCreateChannel={onCreateChannel}
       onCreateRole={onCreateRole}
+      onUpdateRole={onUpdateRole}
       onDeleteRole={onDeleteRole}
       onSetMemberRole={onSetMemberRole}
       onRemoveMember={onRemoveMember}
       onModerateVoice={onModerateVoice}
+      mentionNotification={mentionNotification}
+      onClearMentionNotification={onClearMentionNotification}
+      onUpdateProfile={onUpdateProfile}
+      onUploadAvatar={onUploadAvatar}
+      onRemoveAvatar={onRemoveAvatar}
+      onUpdatePassword={onUpdatePassword}
       onSignOut={() => void supabase!.auth.signOut()}
       selectedChannel={selectedChannel}
       voice={voice}

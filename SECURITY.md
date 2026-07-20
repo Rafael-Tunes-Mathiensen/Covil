@@ -17,8 +17,12 @@ Este projeto está em desenvolvimento e ainda não deve ser tratado como um serv
 - RPCs com `search_path` vazio e privilégios restritos;
 - mensagens renderizadas como texto pelo React;
 - edição e exclusão de mensagens limitadas ao próprio autor por RLS e grants de coluna;
+- atualização de perfil e pasta de avatar limitadas ao próprio UUID;
+- criação de votações, votos e edição de cargos validadas por RPCs autorizadas;
 - limites de tamanho no navegador e no banco;
 - workflow sem permissões de escrita no GitHub.
+
+O bucket de avatares é público para permitir que o navegador carregue as imagens sem URLs temporárias. Os nomes dos objetos usam UUIDs não previsíveis, mas uma URL de avatar compartilhada continua acessível a quem a possuir; não envie imagens sensíveis. Nome, descrição e associação ao Covil continuam protegidos pelas policies de `profiles`.
 
 ## Limite de revogação no MVP
 

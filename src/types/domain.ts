@@ -8,6 +8,7 @@ export const covilPermissions = [
 ] as const
 export type CovilPermission = (typeof covilPermissions)[number]
 export type VoiceModerationAction = 'mute' | 'unmute' | 'disconnect'
+export type MessageKind = 'text' | 'poll'
 
 export interface Covil {
   id: string
@@ -50,8 +51,20 @@ export interface Profile {
   id: string
   displayName: string
   avatarColor: string
+  avatarUrl?: string
+  bio?: string
   status: PresenceStatus
   role?: MemberRole
+}
+
+export interface PollVote {
+  userId: string
+  optionIndex: number
+}
+
+export interface MessagePoll {
+  options: string[]
+  votes: PollVote[]
 }
 
 export interface ChatMessage {
@@ -62,4 +75,14 @@ export interface ChatMessage {
   createdAt: string
   updatedAt?: string
   author: Profile
+  kind?: MessageKind
+  poll?: MessagePoll
+}
+
+export interface MentionNotification {
+  id: string
+  channelId: string
+  authorId: string
+  authorName: string
+  content: string
 }

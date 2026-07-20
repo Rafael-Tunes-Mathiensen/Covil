@@ -17,7 +17,7 @@ flowchart LR
 | `src/components` | Interface e composição visual |
 | `src/features/admin` | Console do proprietário, acessos e métricas operacionais |
 | `src/features/auth` | Sessão e acesso por e-mail |
-| `src/features/covil` | Grupo, canais, cargos, permissões, membros e mensagens |
+| `src/features/covil` | Grupo, canais, perfis, cargos, permissões, mensagens, votações e menções |
 | `src/features/sound` | Efeitos sonoros sintetizados e preferência local |
 | `src/features/voice` | WebRTC, detecção local de fala e transporte de sinalização |
 | `src/lib` | Configuração, Supabase e funções puras |
@@ -46,7 +46,7 @@ Cada participante mantém até cinco `RTCPeerConnection`, uma para cada amigo. E
 - perfect negotiation para evitar colisão de ofertas;
 - candidatos ICE, tolerância breve a desconexão, ICE restart e recriação do peer que continuar falho;
 - reprodução de áudio remoto;
-- publicação e remoção da tela compartilhada;
+- publicação e remoção da tela compartilhada, incluindo a faixa de áudio fornecida pelo navegador;
 - detecção de fala por volume com Web Audio, sem gravar ou enviar amostras de áudio;
 - coleta local de bytes, bitrate, latência, jitter, perda e tipo de rota ICE, sem exibir endereços IP;
 - encerramento de tracks, peers e assinaturas.
@@ -69,7 +69,9 @@ Como a chamada é P2P e não existe SFU controlando a mídia, essa moderação d
 
 O banco usa `auth.uid()` como identidade. RLS limita cada leitura ao Covil do usuário, e RPCs `SECURITY DEFINER` concentram as escritas que exigem autorização, validação ou trava transacional. `create_covil` e `join_covil_by_invite` cuidam do ciclo de entrada; o código de convite tem 128 bits, só pode ser consultado pelo owner e é substituído atomicamente quando alguém entra.
 
-O owner possui implicitamente `manage_channels`, `moderate_voice` e `remove_members`. Membros podem acumular cargos; sua permissão efetiva é a união das permissões de todos eles. Um cargo pode ter o array de permissões vazio e funcionar apenas como identidade visual. Somente o owner cria, exclui ou atribui cargos, até o limite de 12. A criação de canais passa por `create_covil_channel()`, aceita owner ou cargo com `manage_channels` e serializa a contagem para não ultrapassar 25 canais. Remoção de membro e moderação de voz também passam por RPCs, com proteção para o fundador.
+O owner possui implicitamente `manage_channels`, `moderate_voice` e `remove_members`. Membros podem acumular cargos; sua permissão efetiva é a união das permissões de todos eles. Um cargo pode ter o array de permissões vazio e funcionar apenas como identidade visual. Somente o owner cria, edita, exclui ou atribui cargos, até o limite de 12; ele também pode atribuí-los à própria conta sem alterar sua autoridade implícita. A criação de canais passa por `create_covil_channel()`, aceita owner ou cargo com `manage_channels` e serializa a contagem para não ultrapassar 25 canais. Remoção de membro e moderação de voz também passam por RPCs, com proteção para o fundador.
+
+Perfis ficam em `profiles`; imagens de até 2 MB são armazenadas no bucket público `avatars`, em uma pasta controlada pelo UUID do próprio usuário. Mensagens interativas usam `messages.kind/payload`, enquanto um voto atual por pessoa fica em `poll_votes`. Criação de votação e voto passam por RPCs que confirmam acesso ao canal.
 
 Mensagens são texto simples persistido no PostgreSQL. Qualquer membro do canal pode lê-las e mencionar perfis do mesmo Covil, mas as policies RLS e os grants de coluna permitem editar ou excluir somente registros cujo `author_id` seja o usuário autenticado. Eventos `INSERT`, `UPDATE` e `DELETE` recarregam o canal aberto pelo Realtime.
 

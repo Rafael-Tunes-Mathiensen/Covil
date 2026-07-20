@@ -102,6 +102,7 @@ describe('useSoundEffects', () => {
     'mute',
     'unmute',
     'message',
+    'mention',
     'memberJoin',
     'memberLeave',
     'share',

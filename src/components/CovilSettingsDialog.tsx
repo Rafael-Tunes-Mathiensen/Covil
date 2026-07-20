@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Radio, ShieldCheck, Trash2, UserMinus, UsersRound, Wrench } from 'lucide-react'
+import { Check, Pencil, Radio, ShieldCheck, Trash2, UserMinus, UsersRound, Wrench, X } from 'lucide-react'
 import {
   covilPermissions,
   type CovilPermission,
@@ -22,6 +22,7 @@ interface CovilSettingsDialogProps {
   onDeleteRole: (roleId: string) => Promise<unknown>
   onRemoveMember: (userId: string) => Promise<unknown>
   onSetMemberRole: (userId: string, roleId: string, assigned: boolean) => Promise<unknown>
+  onUpdateRole: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
 }
 
 const permissionCopy: Record<CovilPermission, { label: string; description: string }> = {
@@ -99,11 +100,21 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
   )
 }
 
-function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSettingsDialogProps) {
+function RolesPane({
+  roles,
+  isSubmitting,
+  onCreateRole,
+  onDeleteRole,
+  onUpdateRole,
+}: CovilSettingsDialogProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(roleColors[0])
   const [permissions, setPermissions] = useState<CovilPermission[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState(roleColors[0])
+  const [editPermissions, setEditPermissions] = useState<CovilPermission[]>([])
 
   async function createRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -124,6 +135,26 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
       await onDeleteRole(roleId)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível excluir o cargo.')
+    }
+  }
+
+  function beginEdit(role: CovilRole) {
+    setEditingRoleId(role.id)
+    setEditName(role.name)
+    setEditColor(role.color)
+    setEditPermissions([...role.permissions])
+    setError(null)
+  }
+
+  async function updateRole(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingRoleId || !editName.trim() || isSubmitting) return
+    setError(null)
+    try {
+      await onUpdateRole(editingRoleId, editName.trim(), editColor, editPermissions)
+      setEditingRoleId(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível editar o cargo.')
     }
   }
 
@@ -188,13 +219,64 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
         <header><div><ShieldCheck size={18} /><span><strong>Cargos ativos</strong><small>{roles.length}/12 criados</small></span></div></header>
         {roles.length === 0 ? (
           <p className="settings-empty">Nenhum cargo delegado. O fundador mantém todos os controles.</p>
-        ) : roles.map((role) => (
+        ) : roles.map((role) => editingRoleId === role.id ? (
+          <form className="role-card role-card--editing" key={role.id} onSubmit={updateRole}>
+            <input
+              aria-label="Editar nome do cargo"
+              autoFocus
+              maxLength={32}
+              onChange={(event) => setEditName(event.target.value)}
+              value={editName}
+            />
+            <fieldset className="color-picker color-picker--compact">
+              <legend>Cor</legend>
+              {roleColors.map((candidate) => (
+                <button
+                  aria-label={`Usar cor ${candidate}`}
+                  aria-pressed={editColor === candidate}
+                  className={editColor === candidate ? 'is-active' : ''}
+                  key={candidate}
+                  onClick={() => setEditColor(candidate)}
+                  style={{ '--role-color': candidate } as React.CSSProperties}
+                  type="button"
+                />
+              ))}
+            </fieldset>
+            <fieldset className="permission-list permission-list--compact">
+              <legend>Poderes</legend>
+              {covilPermissions.map((permission) => {
+                const checked = editPermissions.includes(permission)
+                return (
+                  <label key={permission}>
+                    <input
+                      checked={checked}
+                      onChange={() => setEditPermissions((current) => (
+                        checked
+                          ? current.filter((value) => value !== permission)
+                          : [...current, permission]
+                      ))}
+                      type="checkbox"
+                    />
+                    <span>{permissionCopy[permission].label}</span>
+                  </label>
+                )
+              })}
+            </fieldset>
+            <div className="role-card__edit-actions">
+              <button aria-label="Salvar cargo" disabled={!editName.trim() || isSubmitting} type="submit"><Check size={15} /></button>
+              <button aria-label="Cancelar edição" onClick={() => setEditingRoleId(null)} type="button"><X size={15} /></button>
+            </div>
+          </form>
+        ) : (
           <article className="role-card" key={role.id}>
             <span className="role-swatch" style={{ '--role-color': role.color } as React.CSSProperties} />
             <div>
               <strong>{role.name}</strong>
               <small>{role.permissions.length > 0 ? role.permissions.map((permission) => permissionCopy[permission].label).join(' · ') : 'Cargo visual · sem permissões'}</small>
             </div>
+            <button aria-label={`Editar cargo ${role.name}`} disabled={isSubmitting} onClick={() => beginEdit(role)} type="button">
+              <Pencil size={15} />
+            </button>
             <button aria-label={`Excluir cargo ${role.name}`} disabled={isSubmitting} onClick={() => void deleteRole(role.id)} type="button">
               <Trash2 size={16} />
             </button>
@@ -252,7 +334,7 @@ function MembersPane({
               <strong>{member.displayName}</strong>
               <small>{member.role === 'owner' ? 'Fundador · acesso total' : 'Membro do Covil'}</small>
             </div>
-            {member.role !== 'owner' && isOwner && (
+            {isOwner && (
               <div className="member-role-chips" aria-label={`Cargos de ${member.displayName}`}>
                 {roles.length === 0 ? <small>Crie um cargo primeiro</small> : roles.map((role) => {
                   const assigned = assignmentKeys.has(`${member.id}:${role.id}`)

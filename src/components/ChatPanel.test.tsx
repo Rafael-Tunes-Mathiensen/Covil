@@ -55,8 +55,10 @@ function renderChat(overrides: Partial<React.ComponentProps<typeof ChatPanel>> =
     messages,
     onDelete: vi.fn(async () => undefined),
     onEdit: vi.fn(async () => undefined),
+    onCreatePoll: vi.fn(async () => undefined),
     onSend: vi.fn(async () => undefined),
     onToggleMembers: vi.fn(),
+    onVotePoll: vi.fn(async () => undefined),
     roles,
     ...overrides,
   }
@@ -92,5 +94,38 @@ describe('ChatPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Excluir mensagem' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão da mensagem' }))
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith('own-message'))
+  })
+
+  it('abre os comandos com barra e publica uma votação', async () => {
+    const onCreatePoll = vi.fn(async () => undefined)
+    renderChat({ onCreatePoll })
+
+    fireEvent.change(screen.getByLabelText('Mensagem em geral'), { target: { value: '/' } })
+    fireEvent.click(screen.getByRole('option', { name: /votação/i }))
+    fireEvent.change(screen.getByLabelText('Pergunta'), { target: { value: 'Qual jogo?' } })
+    fireEvent.change(screen.getByLabelText('Opção 1'), { target: { value: 'Valorant' } })
+    fireEvent.change(screen.getByLabelText('Opção 2'), { target: { value: 'Minecraft' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar votação' }))
+
+    await waitFor(() => expect(onCreatePoll).toHaveBeenCalledWith('Qual jogo?', ['Valorant', 'Minecraft']))
+  })
+
+  it('mostra os votos e permite votar em uma opção', async () => {
+    const onVotePoll = vi.fn(async () => undefined)
+    const pollMessage: ChatMessage = {
+      ...messages[0],
+      id: 'poll',
+      content: 'Hoje tem ranked?',
+      kind: 'poll',
+      poll: {
+        options: ['Sim', 'Não'],
+        votes: [{ userId: 'nina', optionIndex: 0 }],
+      },
+    }
+    renderChat({ messages: [pollMessage], onVotePoll })
+
+    fireEvent.click(screen.getByRole('button', { name: /Sim/ }))
+    await waitFor(() => expect(onVotePoll).toHaveBeenCalledWith('poll', 0))
+    expect(screen.getByText(/1 pessoa votou/)).toBeInTheDocument()
   })
 })

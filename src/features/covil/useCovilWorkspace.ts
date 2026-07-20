@@ -10,6 +10,9 @@ import type {
   CovilRole,
   MemberRole,
   MemberRoleAssignment,
+  MentionNotification,
+  MessageKind,
+  PollVote,
   Profile,
   VoiceModerationAction,
   VoiceModerationState,
@@ -42,6 +45,8 @@ interface MemberRow {
 interface ProfileRow {
   id: string
   display_name: string
+  avatar_url: string | null
+  bio: string | null
 }
 
 interface MessageRow {
@@ -49,8 +54,16 @@ interface MessageRow {
   channel_id: string
   author_id: string
   content: string
+  kind: MessageKind
+  payload: unknown
   created_at: string
   updated_at: string
+}
+
+interface PollVoteRow {
+  message_id: string
+  user_id: string
+  option_index: number
 }
 
 interface CovilRoleRow {
@@ -87,9 +100,24 @@ function asProfile(row: ProfileRow, role?: MemberRole): Profile {
     id: row.id,
     displayName: row.display_name,
     avatarColor: avatarColor(row.id),
+    avatarUrl: row.avatar_url ?? undefined,
+    bio: row.bio ?? undefined,
     status: 'online',
     role,
   }
+}
+
+function parsePollOptions(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || !('options' in payload)) return []
+  const { options } = payload as { options?: unknown }
+  return Array.isArray(options)
+    ? options.filter((option): option is string => typeof option === 'string')
+    : []
+}
+
+function mentionsProfile(content: string, displayName: string) {
+  const escapedName = displayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|\\s)@${escapedName}(?=\\s|$|[.,!?;:])`, 'iu').test(content)
 }
 
 function getErrorMessage(error: unknown) {
@@ -106,6 +134,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   const [roles, setRoles] = useState<CovilRole[]>([])
   const [memberRoleAssignments, setMemberRoleAssignments] = useState<MemberRoleAssignment[]>([])
   const [voiceModerationStates, setVoiceModerationStates] = useState<VoiceModerationState[]>([])
+  const [mentionNotification, setMentionNotification] = useState<MentionNotification | null>(null)
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -117,6 +146,9 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   )
   const selectedChannelIdRef = useRef<string | null>(selectedChannel?.id ?? null)
   const messageRequestRef = useRef(0)
+  const mentionDisplayName =
+    members.find(({ id }) => id === user.id)?.displayName ??
+    String(user.user_metadata.display_name ?? user.email?.split('@')[0] ?? 'Você')
 
   useLayoutEffect(() => {
     selectedChannelIdRef.current = selectedChannel?.id ?? null
@@ -186,7 +218,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       const memberRows = (memberResult.data ?? []) as MemberRow[]
       const profileResult = await client
         .from('profiles')
-        .select('id, display_name')
+        .select('id, display_name, avatar_url, bio')
         .in('id', memberRows.map(({ user_id }) => user_id))
 
       if (profileResult.error) throw profileResult.error
@@ -266,7 +298,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
 
     const result = await client
       .from('messages')
-      .select('id, channel_id, author_id, content, created_at, updated_at')
+      .select('id, channel_id, author_id, content, kind, payload, created_at, updated_at')
       .eq('channel_id', channelId)
       .order('created_at', { ascending: false })
       .limit(150)
@@ -283,6 +315,35 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
 
     const profiles = new Map(members.map((member) => [member.id, member]))
     const rows = [...((result.data ?? []) as MessageRow[])].reverse()
+    const pollMessageIds = rows
+      .filter(({ kind }) => kind === 'poll')
+      .map(({ id }) => id)
+    let pollVotes: PollVoteRow[] = []
+
+    if (pollMessageIds.length > 0) {
+      const voteResult = await client
+        .from('poll_votes')
+        .select('message_id, user_id, option_index')
+        .in('message_id', pollMessageIds)
+      if (voteResult.error) {
+        setError(voteResult.error.message)
+        return
+      }
+      pollVotes = (voteResult.data ?? []) as PollVoteRow[]
+    }
+
+    if (
+      selectedChannelIdRef.current !== channelId ||
+      messageRequestRef.current !== requestId
+    ) return
+
+    const votesByMessage = new Map<string, PollVote[]>()
+    for (const vote of pollVotes) {
+      votesByMessage.set(vote.message_id, [
+        ...(votesByMessage.get(vote.message_id) ?? []),
+        { userId: vote.user_id, optionIndex: vote.option_index },
+      ])
+    }
 
     setMessages(
       rows.map((message) => ({
@@ -292,6 +353,13 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         content: message.content,
         createdAt: message.created_at,
         updatedAt: message.updated_at,
+        kind: message.kind ?? 'text',
+        poll: message.kind === 'poll'
+          ? {
+              options: parsePollOptions(message.payload),
+              votes: votesByMessage.get(message.id) ?? [],
+            }
+          : undefined,
         author:
           profiles.get(message.author_id) ??
           ({
@@ -383,12 +451,41 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         },
         () => void loadWorkspace(false),
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const row = (payload?.new ?? {}) as Partial<MessageRow>
+          if (
+            row.id &&
+            row.channel_id &&
+            row.author_id &&
+            row.author_id !== user.id &&
+            typeof row.content === 'string' &&
+            mentionsProfile(row.content, mentionDisplayName)
+          ) {
+            setMentionNotification({
+              id: row.id,
+              channelId: row.channel_id,
+              authorId: row.author_id,
+              authorName:
+                members.find(({ id }) => id === row.author_id)?.displayName ??
+                'Alguém',
+              content: row.content,
+            })
+          }
+        },
+      )
       .subscribe()
 
     return () => {
       void client.removeChannel(realtime)
     }
-  }, [client, covil?.id, loadWorkspace])
+  }, [client, covil?.id, loadWorkspace, members, mentionDisplayName, user.id])
 
   useEffect(() => {
     // A troca de canal sincroniza a lista local com a assinatura Realtime externa.
@@ -406,6 +503,15 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           schema: 'public',
           table: 'messages',
           filter: `channel_id=eq.${selectedChannel.id}`,
+        },
+        () => void loadMessages(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'poll_votes',
         },
         () => void loadMessages(),
       )
@@ -444,6 +550,27 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       .insert({ channel_id: selectedChannel.id, content: normalized })
 
     if (result.error) throw result.error
+  }
+
+  async function createPoll(question: string, options: string[]) {
+    if (!selectedChannel || selectedChannel.kind !== 'text') {
+      throw new Error('Abra um canal de texto para criar a votação.')
+    }
+    const result = await client.rpc('create_covil_poll', {
+      p_channel_id: selectedChannel.id,
+      p_question: question,
+      p_options: options,
+    })
+    if (result.error) throw result.error
+  }
+
+  async function votePoll(messageId: string, optionIndex: number) {
+    const result = await client.rpc('vote_covil_poll', {
+      p_message_id: messageId,
+      p_option_index: optionIndex,
+    })
+    if (result.error) throw result.error
+    await loadMessages()
   }
 
   async function editMessage(messageId: string, content: string) {
@@ -527,6 +654,20 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     })
   }
 
+  async function updateRole(
+    roleId: string,
+    name: string,
+    color: string,
+    permissions: CovilPermission[],
+  ) {
+    return mutateWorkspace('update_covil_role', {
+      p_role_id: roleId,
+      p_name: name,
+      p_color: color,
+      p_permissions: permissions,
+    })
+  }
+
   async function deleteRole(roleId: string) {
     return mutateWorkspace('delete_covil_role', { p_role_id: roleId })
   }
@@ -561,6 +702,88 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     })
   }
 
+  async function updateProfile(displayName: string, bio: string) {
+    const nextDisplayName = displayName.trim()
+    const nextBio = bio.trim()
+    if (!nextDisplayName) throw new Error('O nome não pode ficar vazio.')
+
+    setIsSubmitting(true)
+    try {
+      const result = await client
+        .from('profiles')
+        .update({
+          display_name: nextDisplayName,
+          bio: nextBio || null,
+        })
+        .eq('id', user.id)
+      if (result.error) throw result.error
+      await client.auth.updateUser({ data: { display_name: nextDisplayName } })
+      await loadWorkspace(false)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function uploadAvatar(file: File) {
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+    if (!allowedTypes.has(file.type)) {
+      throw new Error('Use uma imagem JPG, PNG, WebP ou GIF.')
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      throw new Error('A imagem deve ter no máximo 2 MB.')
+    }
+
+    const extension =
+      file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+    const objectPath = `${user.id}/avatar-${crypto.randomUUID()}.${extension}`
+    const upload = await client.storage.from('avatars').upload(objectPath, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    })
+    if (upload.error) throw upload.error
+
+    const { data } = client.storage.from('avatars').getPublicUrl(objectPath)
+    const update = await client
+      .from('profiles')
+      .update({ avatar_url: data.publicUrl })
+      .eq('id', user.id)
+    if (update.error) {
+      await client.storage.from('avatars').remove([objectPath])
+      throw update.error
+    }
+    await removeStoredAvatars(objectPath)
+    await loadWorkspace(false)
+    return data.publicUrl
+  }
+
+  async function removeAvatar() {
+    const result = await client
+      .from('profiles')
+      .update({ avatar_url: null })
+      .eq('id', user.id)
+    if (result.error) throw result.error
+    await removeStoredAvatars()
+    await loadWorkspace(false)
+  }
+
+  async function removeStoredAvatars(exceptPath?: string) {
+    const listed = await client.storage.from('avatars').list(user.id, { limit: 100 })
+    if (listed.error || !listed.data) return
+    const paths = listed.data
+      .map(({ name }) => `${user.id}/${name}`)
+      .filter((path) => path !== exceptPath)
+    if (paths.length > 0) await client.storage.from('avatars').remove(paths)
+  }
+
+  async function updatePassword(password: string) {
+    if (password.length < 8) {
+      throw new Error('A nova senha deve ter pelo menos 8 caracteres.')
+    }
+    const result = await client.auth.updateUser({ password })
+    if (result.error) throw result.error
+  }
+
   const currentUser =
     members.find(({ id }) => id === user.id) ??
     ({
@@ -586,6 +809,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     roles,
     memberRoleAssignments,
     voiceModerationStates,
+    mentionNotification,
     currentPermissions,
     selectedChannel,
     currentUser,
@@ -596,16 +820,24 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     createCovil,
     joinCovil,
     sendMessage,
+    createPoll,
+    votePoll,
     editMessage,
     deleteMessage,
     refreshInvite,
     rotateInvite,
     createChannel,
     createRole,
+    updateRole,
     deleteRole,
     setMemberRole,
     removeMember,
     moderateVoice,
+    updateProfile,
+    uploadAvatar,
+    removeAvatar,
+    updatePassword,
+    clearMentionNotification: () => setMentionNotification(null),
     reload: loadWorkspace,
   }
 }

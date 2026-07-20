@@ -55,6 +55,7 @@ function isParticipant(value: unknown): value is VoiceParticipant {
   return (
     isBoundedString(candidate.id) &&
     isBoundedString(candidate.displayName, 80) &&
+    (candidate.avatarUrl === undefined || isBoundedString(candidate.avatarUrl, 2_048)) &&
     (candidate.sessionId === undefined || isBoundedString(candidate.sessionId))
   )
 }

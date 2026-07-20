@@ -37,6 +37,7 @@ interface SidebarProps {
   onOpenCovilSettings?: () => void
   soundsEnabled?: boolean
   onToggleSounds?: () => void
+  onOpenProfile?: () => void
 }
 
 export function Sidebar({
@@ -59,6 +60,7 @@ export function Sidebar({
   onOpenCovilSettings,
   soundsEnabled = true,
   onToggleSounds,
+  onOpenProfile,
 }: SidebarProps) {
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [isCopyingInvite, setIsCopyingInvite] = useState(false)
@@ -157,6 +159,7 @@ export function Sidebar({
                       <span className="voice-channel-member" key={participant.id} role="listitem">
                         <Avatar
                           color={participant.id === currentUser.id ? currentUser.avatarColor : '#626b78'}
+                          imageUrl={participant.id === currentUser.id ? currentUser.avatarUrl : undefined}
                           name={participant.displayName}
                           size="small"
                           status="online"
@@ -204,11 +207,13 @@ export function Sidebar({
       )}
 
       <div className="user-strip">
-        <Avatar name={currentUser.displayName} color={currentUser.avatarColor} size="small" status="online" />
-        <span className="user-strip__identity">
-          <strong>{currentUser.displayName}</strong>
-          <small>Disponível</small>
-        </span>
+        <button className="user-strip__profile" onClick={onOpenProfile} title="Configurar meu perfil" type="button">
+          <Avatar name={currentUser.displayName} color={currentUser.avatarColor} imageUrl={currentUser.avatarUrl} size="small" status="online" />
+          <span className="user-strip__identity">
+            <strong>{currentUser.displayName}</strong>
+            <small>Disponível</small>
+          </span>
+        </button>
         {onToggleSounds && (
           <button
             aria-label={soundsEnabled ? 'Desativar sons da interface' : 'Ativar sons da interface'}

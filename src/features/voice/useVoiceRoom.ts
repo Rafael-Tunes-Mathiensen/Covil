@@ -20,14 +20,17 @@ const DEFAULT_MICROPHONE_CONSTRAINTS: MediaTrackConstraints = {
   noiseSuppression: true,
 }
 
-const DEFAULT_SCREEN_SHARE_CONSTRAINTS: DisplayMediaStreamOptions = {
+const DEFAULT_SCREEN_SHARE_CONSTRAINTS = {
   audio: true,
+  selfBrowserSurface: 'exclude',
+  surfaceSwitching: 'include',
+  systemAudio: 'include',
   video: {
     frameRate: { ideal: 30, max: 30 },
     height: { ideal: 720 },
     width: { ideal: 1280 },
   },
-}
+} as DisplayMediaStreamOptions
 
 const SPEAKING_SAMPLE_INTERVAL_MS = 100
 const SPEAKING_ANALYSER_FFT_SIZE = 256

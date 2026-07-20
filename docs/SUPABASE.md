@@ -33,11 +33,12 @@ armazenados no banco.
    npx supabase migration list
    ```
 
-As seis migrations canônicas ficam em `supabase/migrations/`. Elas aplicam, em
+As migrations canônicas ficam em `supabase/migrations/`. Elas aplicam, em
 ordem, o modelo privado, o limite de seis membros e console do proprietário, o
-ajuste de métricas, o Realtime do workspace e, na migration 005, cargos, criação
-controlada de canais e moderação cooperativa de voz. A migration 006 separa os
-tópicos privados de sinalização e Presence. Não execute trechos
+ajuste de métricas, o Realtime do workspace, cargos, criação controlada de canais
+e moderação cooperativa de voz. As migrations seguintes separam os tópicos
+privados de sinalização e Presence e adicionam perfis completos, avatares,
+mensagens interativas, votos e edição de cargos. Não execute trechos
 isolados: funções, grants, triggers e policies foram projetados para entrar
 juntos.
 
@@ -64,14 +65,16 @@ habilitar confirmação de e-mail.
 
 | Recurso | Finalidade | Regra principal |
 | --- | --- | --- |
-| `profiles` | Nome e avatar ligados a `auth.users` | Visível ao próprio usuário e a pessoas que compartilham um Covil |
+| `profiles` | Nome, avatar e descrição ligados a `auth.users` | Visível ao próprio usuário e a pessoas que compartilham um Covil |
+| bucket `avatars` | Imagens públicas de perfil, até 2 MB | Cada usuário escreve e remove apenas na pasta do próprio UUID |
 | `covils` | Grupo privado e código de convite | Membros veem apenas os dados públicos; só o owner consulta ou renova o convite |
 | `covil_members` | Participantes e papel `owner/member` | Visível aos membros do mesmo Covil |
 | `channels` | Canais `text` e `voice` | Membros leem; criação usa RPC e permissão; owner edita ou exclui |
-| `covil_roles` | Cargos com cor e permissões | Membros leem; só o owner cria ou exclui |
+| `covil_roles` | Cargos com cor e permissões | Membros leem; só o owner cria, edita ou exclui |
 | `covil_member_roles` | Atribuições acumuláveis de cargos | Membros leem; só o owner atribui ou remove |
 | `voice_moderation_states` | Mute persistente e pedidos de desconexão por sala | Membros leem; escrita somente pela RPC autorizada |
-| `messages` | Histórico dos canais de texto | Membros leem; cada autor escreve, edita ou exclui as próprias |
+| `messages` | Texto e votações nos canais | Membros leem; cada autor escreve, edita ou exclui as próprias |
+| `poll_votes` | Um voto atual por pessoa e votação | Membros do canal leem; escrita somente pelas RPCs validadas |
 
 Ao cadastrar um usuário, o trigger `private.handle_new_user()` cria o perfil. A
 migration também preenche perfis ausentes de usuários que já existiam.
@@ -140,11 +143,18 @@ await supabase.rpc('set_covil_member_role', {
   p_role_id: roleId,
   p_assigned: true,
 })
+
+await supabase.rpc('update_covil_role', {
+  p_role_id: roleId,
+  p_name: 'Sentinela',
+  p_color: '#7A8CFF',
+  p_permissions: ['moderate_voice', 'manage_channels'],
+})
 ```
 
 `delete_covil_role()` exclui o cargo e suas atribuições. O registro `owner` é a
-fonte exclusiva de propriedade: cargos não transferem ownership e não são
-atribuídos ao fundador.
+fonte exclusiva de propriedade: cargos não transferem ownership. O fundador
+pode receber cargos para exibição, mas continua com todas as permissões implícitas.
 
 ### Moderar voz e remover membros
 
@@ -226,12 +236,32 @@ await supabase.from('messages').update({ content }).eq('id', messageId)
 await supabase.from('messages').delete().eq('id', messageId)
 ```
 
-Menções permanecem como texto (`@Nome`) e são destacadas pelo frontend. Elas não
-alteram as regras de leitura nem criam acesso a perfis de outro Covil.
+### Criar e votar em uma votação
+
+```ts
+const { data: pollId } = await supabase.rpc('create_covil_poll', {
+  p_channel_id: channelId,
+  p_question: 'Qual jogo abrimos?',
+  p_options: ['Valorant', 'Minecraft'],
+})
+
+await supabase.rpc('vote_covil_poll', {
+  p_message_id: pollId,
+  p_option_index: 0,
+})
+```
+
+As RPCs validam a associação ao canal, de 2 a 10 opções distintas, tamanhos e o
+índice escolhido. A chave primária de `poll_votes` substitui o voto anterior da
+mesma pessoa em vez de criar duplicatas.
+
+Menções permanecem como texto (`@Nome`), são destacadas e geram um aviso no
+frontend do destinatário conectado. Elas não alteram as regras de leitura nem
+criam acesso a perfis de outro Covil.
 
 ### Ouvir atualizações do Covil
 
-`messages`, `covil_members`, `profiles`, `channels`, `covils`, `covil_roles`,
+`messages`, `poll_votes`, `covil_members`, `profiles`, `channels`, `covils`, `covil_roles`,
 `covil_member_roles` e `voice_moderation_states` integram a publicação
 `supabase_realtime`. Mensagens usam o filtro do canal atual:
 
@@ -285,7 +315,8 @@ para usuários autenticados que passam pelas policies acima.
 | Ação | Regra de RLS/grant |
 | --- | --- |
 | Ler perfil | Próprio perfil ou usuário com Covil compartilhado |
-| Atualizar perfil | Próprio usuário; somente `display_name` e `avatar_url` |
+| Atualizar perfil | Próprio usuário; somente `display_name`, `avatar_url` e `bio` |
+| Enviar/remover avatar | Próprio usuário e somente na pasta do próprio UUID; bucket público para leitura por URL |
 | Criar Covil | Somente pela RPC `create_covil` autenticada |
 | Entrar em Covil | Somente pela RPC autenticada e com convite válido |
 | Lotação do Covil | Máximo de 6 memberships, garantido por trigger transacional |
@@ -295,9 +326,10 @@ para usuários autenticados que passam pelas policies acima.
 | Criar canal | Pela RPC: owner ou cargo com `manage_channels`; máximo de 25 por Covil |
 | Editar/excluir canal | Owner do Covil |
 | Ler cargos e atribuições | Membro do mesmo Covil |
-| Criar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis |
+| Criar/editar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis; owner pode se autoatribuir |
 | Ler mensagem | Membro atual do canal/Covil |
 | Criar/editar/excluir mensagem | Autor autenticado e membro atual; canal deve ser de texto |
+| Criar/votar em votação | Membro atual do canal de texto, pelas RPCs; um voto atual por pessoa |
 | Observar ou anunciar Presence na voz | Membro autenticado do Covil; somente no tópico `voice-presence:<channel_uuid>` |
 | Publicar ou receber sinais WebRTC | Membro autenticado do Covil; somente no tópico `voice:<channel_uuid>` e enquanto assina a chamada |
 | Moderar voz | Owner ou cargo com `moderate_voice`; fundador protegido; aplicação cooperativa no cliente |

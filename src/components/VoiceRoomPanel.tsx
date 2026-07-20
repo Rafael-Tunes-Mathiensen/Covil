@@ -3,9 +3,11 @@ import {
   AudioLines,
   Headphones,
   LoaderCircle,
+  Maximize2,
   Mic,
   MicOff,
   MonitorUp,
+  Minimize2,
   PhoneOff,
   Radio,
   ShieldCheck,
@@ -37,6 +39,7 @@ interface VoiceRoomPanelProps {
   canModerate?: boolean
   onJoin?: () => Promise<void>
   onModerate?: (userId: string, action: VoiceModerationAction) => Promise<unknown>
+  onOpenProfile?: (profile: Profile) => void
 }
 
 export function VoiceRoomPanel({
@@ -54,7 +57,9 @@ export function VoiceRoomPanel({
   canModerate = false,
   onJoin,
   onModerate,
+  onOpenProfile,
 }: VoiceRoomPanelProps) {
+  const [isScreenFocused, setIsScreenFocused] = useState(true)
   const remoteShare = voice.remotePeers.find(({ screenStream }) => screenStream)
   const screenStream = remoteShare?.screenStream ?? voice.localScreenStream
   const sharer = remoteShare?.participant.displayName ?? currentUser.displayName
@@ -73,6 +78,57 @@ export function VoiceRoomPanel({
     () => new Map(moderationStates.map((state) => [state.userId, state])),
     [moderationStates],
   )
+  const participantsGrid = (
+    <div className="voice-grid">
+      <header><Radio size={17} /><span>{voice.participants.length} na sala agora</span></header>
+      <div aria-label={`Participantes em ${roomName}`} className="voice-grid__people" role="list">
+        {voice.participants.map((participant, index) => {
+          const profile = participant.id === currentUser.id ? currentUser : profiles.get(participant.id)
+          const isSpeaking = voice.speakingParticipantIds.has(participant.id)
+          const moderation = moderationByMember.get(participant.id)
+          const role = firstRoleByMember.get(participant.id)
+          const canTarget = canModerate && participant.id !== currentUser.id && profile?.role !== 'owner' && onModerate
+
+          return (
+            <article className={`voice-person${isSpeaking ? ' is-speaking' : ''}`} key={participant.id} role="listitem">
+              <button className="voice-person__profile" disabled={!profile || !onOpenProfile} onClick={() => profile && onOpenProfile?.(profile)} type="button">
+                <div className="voice-person__avatar">
+                  <Avatar
+                    color={profile?.avatarColor ?? ['#7a8cff', '#55c98a', '#d58cff'][index % 3]}
+                    imageUrl={profile?.avatarUrl}
+                    name={participant.displayName}
+                    size="large"
+                    speaking={isSpeaking}
+                  />
+                  {moderation?.serverMuted && <span className="voice-person__muted" title="Silenciado pela moderação"><MicOff size={14} /></span>}
+                </div>
+                <span className="voice-person__signal" aria-hidden="true"><i /><i /><i /><i /></span>
+                <span className="voice-person__name-line">
+                  <strong>{participant.displayName}</strong>
+                  {role && <span className="voice-person__role" style={{ '--role-color': role.color } as React.CSSProperties}><i />{role.name}</span>}
+                </span>
+                <span className="voice-person__status">
+                  {moderation?.serverMuted ? 'silenciado pelo moderador' : isSpeaking ? <><AudioLines size={13} /> falando</> : participant.id === currentUser.id ? 'você' : 'na voz'}
+                </span>
+              </button>
+              {canTarget && (
+                <ModerationControls
+                  isMuted={moderation?.serverMuted ?? false}
+                  memberName={participant.displayName}
+                  onModerate={(action) => onModerate(participant.id, action)}
+                />
+              )}
+            </article>
+          )
+        })}
+      </div>
+      {!isConnectedRoom && (
+        <button className="primary-button primary-button--compact voice-grid__join" onClick={() => void (onJoin ? onJoin() : voice.join())} type="button">
+          <Headphones size={18} /><span>Entrar nesta sala</span>
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <section className="workspace-panel voice-panel">
@@ -88,11 +144,21 @@ export function VoiceRoomPanel({
       </header>
 
       {screenStream ? (
-        <div className="screen-stage">
-          <div className="screen-stage__meta">
-            <MonitorUp size={16} /><span>{sharer} está compartilhando</span>
+        <div className={`screen-layout${isScreenFocused ? ' is-screen-focused' : ' is-people-focused'}`}>
+          <div className="screen-stage">
+            <div className="screen-stage__meta">
+              <span><MonitorUp size={16} />{sharer} está compartilhando</span>
+              <button onClick={() => setIsScreenFocused((value) => !value)} type="button">
+                {isScreenFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                {isScreenFocused ? 'Ver pessoas' : 'Focar tela'}
+              </button>
+            </div>
+            <StreamVideo label={`Tela compartilhada por ${sharer}`} muted={!remoteShare} stream={screenStream} />
+            {!remoteShare && screenStream.getAudioTracks().length === 0 && (
+              <p className="screen-stage__audio-hint">O navegador não forneceu áudio. Escolha uma aba com áudio e marque “Compartilhar áudio”.</p>
+            )}
           </div>
-          <StreamVideo label={`Tela compartilhada por ${sharer}`} muted={!remoteShare} stream={screenStream} />
+          <aside className="screen-layout__people">{participantsGrid}</aside>
         </div>
       ) : voice.status === 'idle' ? (
         <div className="voice-empty">
@@ -110,60 +176,7 @@ export function VoiceRoomPanel({
       ) : isTransitioning ? (
         <div className="voice-empty"><LoaderCircle className="spin" size={32} /><p>{voice.status === 'leaving' ? 'Trocando de sala…' : 'Conectando à sala…'}</p></div>
       ) : (
-        <div className="voice-grid">
-          <header><Radio size={17} /><span>{voice.participants.length} na sala agora</span></header>
-          <div
-            aria-label={`Participantes em ${roomName}`}
-            className="voice-grid__people"
-            role="list"
-          >
-            {voice.participants.map((participant, index) => {
-              const profile = participant.id === currentUser.id ? currentUser : profiles.get(participant.id)
-              const isSpeaking = voice.speakingParticipantIds.has(participant.id)
-              const moderation = moderationByMember.get(participant.id)
-              const role = firstRoleByMember.get(participant.id)
-              const canTarget = canModerate && participant.id !== currentUser.id && profile?.role !== 'owner' && onModerate
-
-              return (
-                <article className={`voice-person${isSpeaking ? ' is-speaking' : ''}`} key={participant.id} role="listitem">
-                  <div className="voice-person__avatar">
-                    <Avatar
-                      color={profile?.avatarColor ?? ['#7a8cff', '#55c98a', '#d58cff'][index % 3]}
-                      name={participant.displayName}
-                      size="large"
-                      speaking={isSpeaking}
-                    />
-                    {moderation?.serverMuted && <span className="voice-person__muted" title="Silenciado pela moderação"><MicOff size={14} /></span>}
-                  </div>
-                  <span className="voice-person__signal" aria-hidden="true"><i /><i /><i /><i /></span>
-                  <span className="voice-person__name-line">
-                    <strong>{participant.displayName}</strong>
-                    {role && <span className="voice-person__role" style={{ '--role-color': role.color } as React.CSSProperties}><i />{role.name}</span>}
-                  </span>
-                  <span className="voice-person__status">
-                    {moderation?.serverMuted ? 'silenciado pelo moderador' : isSpeaking ? <><AudioLines size={13} /> falando</> : participant.id === currentUser.id ? 'você' : 'na voz'}
-                  </span>
-                  {canTarget && (
-                    <ModerationControls
-                      isMuted={moderation?.serverMuted ?? false}
-                      memberName={participant.displayName}
-                      onModerate={(action) => onModerate(participant.id, action)}
-                    />
-                  )}
-                </article>
-              )
-            })}
-          </div>
-          {!isConnectedRoom && (
-            <button
-              className="primary-button primary-button--compact voice-grid__join"
-              onClick={() => void (onJoin ? onJoin() : voice.join())}
-              type="button"
-            >
-              <Headphones size={18} /><span>Entrar nesta sala</span>
-            </button>
-          )}
-        </div>
+        participantsGrid
       )}
       {isCurrentVoiceRoom && voice.error && (
         <button

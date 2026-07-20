@@ -129,6 +129,7 @@ function VoiceHarness({ transport }: { transport: SignalTransport }) {
       <span aria-label="Mute do servidor">{String(voice.isServerMuted)}</span>
       <span aria-label="Peers remotos">{voice.remotePeers.length}</span>
       <button onClick={() => void voice.join()} type="button">Entrar</button>
+      <button onClick={() => void voice.startScreenShare()} type="button">Compartilhar tela</button>
       <button onClick={voice.toggleMute} type="button">Alternar mute</button>
       <button onClick={() => voice.setServerMuted(true)} type="button">Impor mute</button>
       <button onClick={() => voice.setServerMuted(false)} type="button">Liberar mute</button>
@@ -146,6 +147,7 @@ describe('useVoiceRoom', () => {
       configurable: true,
       value: {
         getUserMedia: vi.fn(async () => new FakeMediaStream()),
+        getDisplayMedia: vi.fn(async () => new FakeMediaStream()),
       },
     })
     vi.stubGlobal('MediaStream', FakeMediaStream)
@@ -190,6 +192,32 @@ describe('useVoiceRoom', () => {
         participant: expect.objectContaining({ sessionId: expect.any(String) }),
       }),
     )
+  })
+
+  it('solicita audio do sistema ao iniciar o compartilhamento de tela', async () => {
+    const transport: SignalTransport = {
+      subscribe: vi.fn(() => () => undefined),
+      send: vi.fn(),
+      presence: vi.fn(({ participant, onChange }) => {
+        onChange([participant])
+        return () => undefined
+      }),
+    }
+
+    render(<VoiceHarness transport={transport} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByText('joined')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compartilhar tela' }))
+    await waitFor(() => {
+      expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith(
+        expect.objectContaining({
+          audio: true,
+          surfaceSwitching: 'include',
+          systemAudio: 'include',
+        }),
+      )
+    })
   })
 
   it('publica quando o participante local está falando', async () => {
