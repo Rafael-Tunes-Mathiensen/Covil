@@ -744,8 +744,8 @@ textarea:focus-visible {
   min-height: 68px;
   flex: 0 0 68px;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px 0 16px;
+  gap: 4px;
+  padding: 0 10px;
   border-top: 1px solid var(--line);
   background: #0c0f15;
 }
@@ -755,6 +755,7 @@ textarea:focus-visible {
   min-width: 0;
   flex: 1;
   gap: 2px;
+  overflow: hidden;
 }
 
 .user-strip__identity strong {
@@ -771,8 +772,9 @@ textarea:focus-visible {
 
 .user-strip > button {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
   place-items: center;
   border-radius: 7px;
   color: var(--faint);
