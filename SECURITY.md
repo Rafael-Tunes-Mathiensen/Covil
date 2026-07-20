@@ -16,6 +16,7 @@ Este projeto está em desenvolvimento e ainda não deve ser tratado como um serv
 - canais privados de voz com autorização em `realtime.messages`;
 - RPCs com `search_path` vazio e privilégios restritos;
 - mensagens renderizadas como texto pelo React;
+- edição e exclusão de mensagens limitadas ao próprio autor por RLS e grants de coluna;
 - limites de tamanho no navegador e no banco;
 - workflow sem permissões de escrita no GitHub.
 

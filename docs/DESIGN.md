@@ -16,9 +16,11 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
 - Selecionar uma sala de voz permite inspecionar seus ocupantes sem interromper a chamada mantida no dock; entrar nela é uma ação explícita.
-- O contorno do avatar e uma pequena forma de onda respondem somente enquanto o detector local identifica fala.
+- O contorno do avatar e uma pequena forma de onda entre a foto e o nome respondem somente enquanto o detector local identifica fala.
 - O compartilhamento de tela expande a área principal e recolhe o contexto secundário.
 - Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.
+- Ações de editar ou excluir aparecem no hover e no foco da própria mensagem; menções são sugeridas acima do compositor e destacadas no fluxo da conversa.
+- Cargos visuais aparecem como rótulos compactos junto aos nomes, sem sugerir uma permissão que não exista.
 - Ícones ativos, botões e estados de hover usam escala ou deslocamento mínimo para confirmar a ação.
 
 ## Movimento, som e acessibilidade

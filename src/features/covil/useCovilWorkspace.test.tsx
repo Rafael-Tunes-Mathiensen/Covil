@@ -10,7 +10,7 @@ interface FakeWorkspaceState {
   currentRole: 'owner' | 'member'
   channels: Array<{ id: string; covil_id: string; name: string; kind: 'text' | 'voice'; position: number }>
   members: Array<{ user_id: string; role: 'owner' | 'member' }>
-  messages: Array<{ id: string; channel_id: string; author_id: string; content: string; created_at: string }>
+  messages: Array<{ id: string; channel_id: string; author_id: string; content: string; created_at: string; updated_at?: string }>
   profiles: Array<{ id: string; display_name: string }>
   roles: Array<{
     id: string
@@ -33,6 +33,8 @@ interface FakeWorkspaceState {
 class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
   private columns = ''
   private filters = new Map<string, unknown>()
+  private mutation: { kind: 'update'; content: string } | { kind: 'delete' } | null = null
+  private mutationApplied = false
 
   constructor(
     private readonly table: string,
@@ -41,6 +43,16 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
 
   select(columns: string) {
     this.columns = columns
+    return this
+  }
+
+  update(values: { content: string }) {
+    this.mutation = { kind: 'update', content: values.content }
+    return this
+  }
+
+  delete() {
+    this.mutation = { kind: 'delete' }
     return this
   }
 
@@ -73,6 +85,24 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
   }
 
   private result() {
+    if (this.table === 'messages' && this.mutation && !this.mutationApplied) {
+      this.mutationApplied = true
+      const messageId = this.filters.get('id')
+      const authorId = this.filters.get('author_id')
+      const index = this.state.messages.findIndex((message) => (
+        message.id === messageId && message.author_id === authorId
+      ))
+      if (index >= 0 && this.mutation.kind === 'update') {
+        this.state.messages[index] = {
+          ...this.state.messages[index],
+          content: this.mutation.content,
+          updated_at: '2026-07-19T18:00:00.000Z',
+        }
+      }
+      if (index >= 0 && this.mutation.kind === 'delete') this.state.messages.splice(index, 1)
+      return { data: null, error: null }
+    }
+
     if (this.table === 'covil_members' && this.columns === 'covil_id, role') {
       const isCurrentMember = this.filters.get('user_id') === memberId
       return {
@@ -238,12 +268,40 @@ describe('useCovilWorkspace', () => {
       author_id: memberId,
       content: 'Chegou sem recarregar.',
       created_at: '2026-07-19T17:00:00.000Z',
+      updated_at: '2026-07-19T17:00:00.000Z',
     })
     fake.emit('messages')
 
     await waitFor(() => {
       expect(result.current.messages.map(({ content }) => content)).toContain('Chegou sem recarregar.')
     })
+  })
+
+  it('edita e exclui somente a mensagem do usuário conectado', async () => {
+    const channelId = 'general-channel-id'
+    const messageId = 'own-message-id'
+    const fake = createFakeClient({
+      channels: [{ id: channelId, covil_id: covilId, name: 'geral', kind: 'text', position: 0 }],
+      messages: [{
+        id: messageId,
+        channel_id: channelId,
+        author_id: memberId,
+        content: 'Texto original',
+        created_at: '2026-07-19T17:00:00.000Z',
+        updated_at: '2026-07-19T17:00:00.000Z',
+      }],
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.messages).toHaveLength(1))
+    await act(() => result.current.editMessage(messageId, 'Texto editado'))
+
+    expect(fake.state.messages[0]?.content).toBe('Texto editado')
+    await waitFor(() => expect(result.current.messages[0]?.content).toBe('Texto editado'))
+
+    await act(() => result.current.deleteMessage(messageId))
+    expect(fake.state.messages).toHaveLength(0)
+    await waitFor(() => expect(result.current.messages).toHaveLength(0))
   })
 
   it('combina cargos atribuídos nas permissões efetivas do usuário', async () => {

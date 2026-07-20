@@ -949,6 +949,7 @@ textarea:focus-visible {
 }
 
 .message {
+  position: relative;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   gap: 12px;
@@ -985,7 +986,9 @@ textarea:focus-visible {
 
 .message__body header {
   display: flex;
+  min-width: 0;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 9px;
   margin-bottom: 5px;
 }
@@ -1008,6 +1011,129 @@ textarea:focus-visible {
   white-space: pre-wrap;
 }
 
+.message__role,
+.member-row__role {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 128px;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--role-color, var(--accent)) 78%, #d7dbe1);
+  font-size: 8px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message__role i,
+.member-row__role i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--role-color, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--role-color, var(--accent)) 12%, transparent);
+}
+
+.message__edited {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 9px;
+}
+
+.message__actions {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  right: 7px;
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  opacity: 0;
+  background: var(--raised);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.message:hover .message__actions,
+.message:focus-within .message__actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.message__actions button,
+.message-edit button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--faint);
+  background: transparent;
+}
+
+.message__actions button:hover,
+.message-edit button:hover {
+  color: var(--text);
+  background: rgb(255 255 255 / 5%);
+}
+
+.message__actions button.is-confirming {
+  color: #ffabb1;
+  background: rgb(239 93 104 / 14%);
+  animation: status-pop var(--motion-base) var(--ease-out) both;
+}
+
+.message-edit {
+  display: grid;
+  gap: 6px;
+}
+
+.message-edit textarea {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 112 67 / 34%);
+  border-radius: 9px;
+  outline: none;
+  color: var(--text);
+  background: var(--raised);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message-edit > div {
+  display: flex;
+  gap: 3px;
+}
+
+.message__error {
+  display: block;
+  margin-top: 5px;
+  color: #ff8b93;
+  font-size: 9px;
+}
+
+.message-mention {
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #ff9b7b;
+  background: rgb(255 112 67 / 10%);
+  font-weight: 600;
+}
+
+.message-mention--self {
+  color: #ffd6c9;
+  background: rgb(255 112 67 / 24%);
+  box-shadow: inset 0 0 0 1px rgb(255 112 67 / 18%);
+}
+
 .composer {
   position: relative;
   display: flex;
@@ -1016,6 +1142,65 @@ textarea:focus-visible {
   gap: 8px;
   padding: 12px 24px 18px;
   background: linear-gradient(transparent, var(--bg) 16%);
+}
+
+.mention-menu {
+  position: absolute;
+  z-index: 8;
+  right: 24px;
+  bottom: 70px;
+  left: 24px;
+  display: grid;
+  max-width: 320px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #151a23;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 42%);
+  animation: mention-menu-in var(--motion-base) var(--ease-out) both;
+}
+
+@keyframes mention-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mention-menu header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px 7px;
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.mention-menu > button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: #b7bec8;
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+}
+
+.mention-menu > button.is-active,
+.mention-menu > button:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.mention-menu .avatar--small {
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
+  font-size: 8px;
 }
 
 .composer textarea {
@@ -1208,6 +1393,25 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.member-row__name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.member-row__name-line strong {
+  min-width: 0;
+}
+
+.member-row__role {
+  flex: 0 1 auto;
+}
+
+.member-row small.member-row__role {
+  color: color-mix(in srgb, var(--role-color, var(--accent)) 78%, #d7dbe1);
+}
+
 .member-row small {
   color: var(--faint);
   font-size: 8px;
@@ -1391,15 +1595,16 @@ textarea:focus-visible {
 }
 
 .voice-person__signal {
-  position: absolute;
-  right: -18px;
-  bottom: 8px;
   display: flex;
-  height: 24px;
+  width: 26px;
+  height: 18px;
   align-items: end;
+  justify-content: center;
   gap: 2px;
+  margin-top: 8px;
   opacity: 0;
-  transition: opacity var(--motion-fast) ease;
+  visibility: hidden;
+  transition: opacity var(--motion-fast) ease, visibility var(--motion-fast) ease;
 }
 
 .voice-person__signal i {
@@ -1412,6 +1617,7 @@ textarea:focus-visible {
 
 .voice-person.is-speaking .voice-person__signal {
   opacity: 1;
+  visibility: visible;
 }
 
 .voice-person.is-speaking .voice-person__signal i {
@@ -1428,8 +1634,23 @@ textarea:focus-visible {
 }
 
 .voice-person strong {
-  margin-top: 20px;
   font-size: 13px;
+}
+
+.voice-person__name-line {
+  display: flex;
+  max-width: 164px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.voice-person__name-line > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .voice-person__status {
@@ -1451,7 +1672,7 @@ textarea:focus-visible {
   max-width: 132px;
   align-items: center;
   gap: 5px;
-  margin-top: 6px;
+  margin-top: 0;
   overflow: hidden;
   color: #8e96a3;
   font-size: 8px;
@@ -1460,9 +1681,30 @@ textarea:focus-visible {
 }
 
 .voice-person__role i,
+.message__role i,
+.member-row__role i,
 .member-role-chips i,
 .role-swatch {
   background: var(--role-color, var(--accent));
+}
+
+.role-form__hint {
+  margin: -2px 0 0;
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (hover: none) {
+  .message__actions {
+    position: static;
+    grid-column: 2;
+    width: max-content;
+    margin-top: 5px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .voice-person__role i {

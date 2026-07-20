@@ -50,6 +50,7 @@ interface MessageRow {
   author_id: string
   content: string
   created_at: string
+  updated_at: string
 }
 
 interface CovilRoleRow {
@@ -265,7 +266,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
 
     const result = await client
       .from('messages')
-      .select('id, channel_id, author_id, content, created_at')
+      .select('id, channel_id, author_id, content, created_at, updated_at')
       .eq('channel_id', channelId)
       .order('created_at', { ascending: false })
       .limit(150)
@@ -290,6 +291,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         authorId: message.author_id,
         content: message.content,
         createdAt: message.created_at,
+        updatedAt: message.updated_at,
         author:
           profiles.get(message.author_id) ??
           ({
@@ -400,7 +402,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'messages',
           filter: `channel_id=eq.${selectedChannel.id}`,
@@ -442,6 +444,31 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
       .insert({ channel_id: selectedChannel.id, content: normalized })
 
     if (result.error) throw result.error
+  }
+
+  async function editMessage(messageId: string, content: string) {
+    const normalized = normalizeMessage(content)
+    if (!normalized) throw new Error('A mensagem não pode ficar vazia.')
+
+    const result = await client
+      .from('messages')
+      .update({ content: normalized })
+      .eq('id', messageId)
+      .eq('author_id', user.id)
+
+    if (result.error) throw result.error
+    await loadMessages()
+  }
+
+  async function deleteMessage(messageId: string) {
+    const result = await client
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('author_id', user.id)
+
+    if (result.error) throw result.error
+    await loadMessages()
   }
 
   async function rotateInvite() {
@@ -569,6 +596,8 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     createCovil,
     joinCovil,
     sendMessage,
+    editMessage,
+    deleteMessage,
     refreshInvite,
     rotateInvite,
     createChannel,

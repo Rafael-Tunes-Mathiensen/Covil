@@ -107,7 +107,7 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
 
   async function createRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || permissions.length === 0 || isSubmitting) return
+    if (!name.trim() || isSubmitting) return
     setError(null)
     try {
       await onCreateRole(name.trim(), color, permissions)
@@ -131,7 +131,7 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
     <div className="roles-layout">
       <section className="settings-section">
         <header>
-          <div><Wrench size={18} /><span><strong>Novo cargo</strong><small>Combine somente os poderes necessários.</small></span></div>
+          <div><Wrench size={18} /><span><strong>Novo cargo</strong><small>Use como identidade visual e, se quiser, conceda poderes.</small></span></div>
         </header>
         <form className="role-form" onSubmit={createRole}>
           <label className="field-label" htmlFor="role-name">Nome do cargo</label>
@@ -157,7 +157,7 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
             ))}
           </fieldset>
           <fieldset className="permission-list">
-            <legend>Permissões</legend>
+            <legend>Permissões opcionais</legend>
             {covilPermissions.map((permission) => {
               const checked = permissions.includes(permission)
               return (
@@ -177,7 +177,8 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
             })}
           </fieldset>
           {error && <p className="dialog-error" role="alert">{error}</p>}
-          <button className="primary-button primary-button--compact" disabled={!name.trim() || permissions.length === 0 || isSubmitting} type="submit">
+          <p className="role-form__hint">Sem marcar permissões, o cargo continua visível ao lado do nome.</p>
+          <button className="primary-button primary-button--compact" disabled={!name.trim() || isSubmitting} type="submit">
             <ShieldCheck size={17} /> Criar cargo
           </button>
         </form>
@@ -192,7 +193,7 @@ function RolesPane({ roles, isSubmitting, onCreateRole, onDeleteRole }: CovilSet
             <span className="role-swatch" style={{ '--role-color': role.color } as React.CSSProperties} />
             <div>
               <strong>{role.name}</strong>
-              <small>{role.permissions.map((permission) => permissionCopy[permission].label).join(' · ')}</small>
+              <small>{role.permissions.length > 0 ? role.permissions.map((permission) => permissionCopy[permission].label).join(' · ') : 'Cargo visual · sem permissões'}</small>
             </div>
             <button aria-label={`Excluir cargo ${role.name}`} disabled={isSubmitting} onClick={() => void deleteRole(role.id)} type="button">
               <Trash2 size={16} />

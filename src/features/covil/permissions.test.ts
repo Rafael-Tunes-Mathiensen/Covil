@@ -49,4 +49,22 @@ describe('permissões do Covil', () => {
   it('não concede capacidades sem um cargo correspondente', () => {
     expect(getEffectivePermissions('member', 'another-member', roles, assignments)).toEqual([])
   })
+
+  it('mantém um cargo visual sem conceder capacidades', () => {
+    const visualRole: CovilRole = {
+      id: 'role-visual',
+      covilId: 'covil',
+      name: 'Raider',
+      color: '#55c98a',
+      permissions: [],
+      position: 2,
+    }
+    const visualAssignment: MemberRoleAssignment = {
+      covilId: 'covil',
+      userId: 'visual-member',
+      roleId: visualRole.id,
+    }
+
+    expect(getEffectivePermissions('member', 'visual-member', [visualRole], [visualAssignment])).toEqual([])
+  })
 })

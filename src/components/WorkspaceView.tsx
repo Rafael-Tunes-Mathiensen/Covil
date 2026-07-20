@@ -40,6 +40,8 @@ interface WorkspaceViewProps {
   onSelectChannel: (channel: Channel) => void
   onJoinVoiceChannel?: (channel: Channel) => Promise<void>
   onSendMessage: (content: string) => Promise<void>
+  onEditMessage: (messageId: string, content: string) => Promise<void>
+  onDeleteMessage: (messageId: string) => Promise<void>
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
   onRotateInvite?: () => Promise<string>
@@ -71,6 +73,8 @@ export function WorkspaceView({
   onSelectChannel,
   onJoinVoiceChannel,
   onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
   onSignOut,
   onRefreshInvite,
   onRotateInvite,
@@ -95,7 +99,7 @@ export function WorkspaceView({
   const [showCovilSettings, setShowCovilSettings] = useState(false)
   const [createChannelKind, setCreateChannelKind] = useState<ChannelKind | null>(null)
   const sounds = useSoundEffects()
-  const previousMessageRef = useRef<{ channelId: string; messageId: string | null } | null>(null)
+  const previousMessageRef = useRef<{ channelId: string; messageIds: Set<string> } | null>(null)
   const previousVoiceIdsRef = useRef<Set<string> | null>(null)
   const canManageChannels = hasCovilPermission(currentPermissions, 'manage_channels')
   const canModerateVoice = hasCovilPermission(currentPermissions, 'moderate_voice')
@@ -122,19 +126,16 @@ export function WorkspaceView({
       : voice
 
   useEffect(() => {
-    const lastMessage = messages.at(-1) ?? null
     const previous = previousMessageRef.current
     if (
       previous?.channelId === selectedChannel.id &&
-      previous.messageId &&
-      lastMessage?.id !== previous.messageId &&
-      lastMessage?.authorId !== currentUser.id
+      messages.some(({ id, authorId }) => !previous.messageIds.has(id) && authorId !== currentUser.id)
     ) {
       sounds.play('message')
     }
     previousMessageRef.current = {
       channelId: selectedChannel.id,
-      messageId: lastMessage?.id ?? null,
+      messageIds: new Set(messages.map(({ id }) => id)),
     }
   }, [currentUser.id, messages, selectedChannel.id, sounds])
 
@@ -180,10 +181,16 @@ export function WorkspaceView({
         {selectedChannel.kind === 'text' ? (
           <ChatPanel
             channel={selectedChannel}
+            currentUserId={currentUser.id}
             isDemo={isDemo}
+            memberRoleAssignments={memberRoleAssignments}
+            members={members}
             messages={messages}
+            onDelete={onDeleteMessage}
+            onEdit={onEditMessage}
             onSend={onSendMessage}
             onToggleMembers={() => setShowMembers((value) => !value)}
+            roles={roles}
           />
         ) : (
           <VoiceRoomPanel

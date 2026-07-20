@@ -215,6 +215,20 @@ Enviar `author_id`, `created_at` ou `updated_at` pelo cliente é bloqueado pelos
 grants de coluna. Mensagens vazias, acima de 4.000 caracteres ou destinadas a
 um canal de voz também são rejeitadas.
 
+### Editar ou excluir uma mensagem própria
+
+O cliente envia somente o novo conteúdo ou o identificador. A policy confirma
+novamente que `author_id = auth.uid()`; nem o owner pode alterar o texto escrito
+por outra pessoa:
+
+```ts
+await supabase.from('messages').update({ content }).eq('id', messageId)
+await supabase.from('messages').delete().eq('id', messageId)
+```
+
+Menções permanecem como texto (`@Nome`) e são destacadas pelo frontend. Elas não
+alteram as regras de leitura nem criam acesso a perfis de outro Covil.
+
 ### Ouvir atualizações do Covil
 
 `messages`, `covil_members`, `profiles`, `channels`, `covils`, `covil_roles`,
@@ -227,7 +241,7 @@ const subscription = supabase
   .on(
     'postgres_changes',
     {
-      event: 'INSERT',
+      event: '*',
       schema: 'public',
       table: 'messages',
       filter: `channel_id=eq.${channelId}`,

@@ -80,10 +80,13 @@ function MemberGroup({
           <div className={`member-row${member.status === 'offline' ? ' is-offline' : ''}${isSpeaking ? ' is-speaking' : ''}`} key={member.id}>
             <Avatar color={member.avatarColor} name={member.displayName} size="small" speaking={isSpeaking} status={member.status} />
             <span>
-              <strong>{member.displayName}</strong>
-              {member.role === 'owner' ? <small>fundador</small> : firstRole && (
-                <small style={{ '--role-color': firstRole.color } as React.CSSProperties}>{firstRole.name}</small>
-              )}
+              <span className="member-row__name-line">
+                <strong>{member.displayName}</strong>
+                {firstRole && member.role !== 'owner' && (
+                  <small className="member-row__role" style={{ '--role-color': firstRole.color } as React.CSSProperties}><i />{firstRole.name}</small>
+                )}
+              </span>
+              {member.role === 'owner' && <small>fundador</small>}
             </span>
             {voiceIds.has(member.id) && (
               <span

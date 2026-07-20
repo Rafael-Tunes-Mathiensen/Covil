@@ -60,5 +60,6 @@ export interface ChatMessage {
   authorId: string
   content: string
   createdAt: string
+  updatedAt?: string
   author: Profile
 }

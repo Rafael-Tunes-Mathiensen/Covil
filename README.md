@@ -20,11 +20,12 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - identidade visual responsiva e instalável como PWA;
 - cadastro e login por e-mail com Supabase Auth;
 - criação de grupo privado e entrada por convite de uso único;
+- mensagens em tempo real com menções, edição e exclusão protegidas por autoria;
 - canais de texto e salas de voz criados pelo owner ou por cargos autorizados, até o limite de 25 canais;
 - chamadas mesh para até seis participantes, com ocupantes visíveis por sala e inspeção sem abandonar a chamada atual;
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
 - compartilhamento de tela em 720p/30 fps;
-- até 12 cargos acumuláveis com permissões para criar canais, moderar voz ou remover membros;
+- até 12 cargos acumuláveis, inclusive cargos apenas visuais, com permissões opcionais para criar canais, moderar voz ou remover membros;
 - mute persistente e desconexão cooperativa da chamada, sem permitir moderar o fundador;
 - políticas RLS e RPCs autorizadas no PostgreSQL;
 - animações responsivas, diálogos acessíveis e efeitos sonoros sintetizados que podem ser desativados;

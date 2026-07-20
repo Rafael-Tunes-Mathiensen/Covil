@@ -48,6 +48,18 @@ function DemoWorkspace() {
     setMessages((current) => [...current, message])
   }
 
+  async function editMessage(messageId: string, content: string) {
+    setMessages((current) => current.map((message) => (
+      message.id === messageId
+        ? { ...message, content, updatedAt: new Date().toISOString() }
+        : message
+    )))
+  }
+
+  async function deleteMessage(messageId: string) {
+    setMessages((current) => current.filter(({ id }) => id !== messageId))
+  }
+
   return (
     <WorkspaceView
       channels={demoChannels}
@@ -56,6 +68,8 @@ function DemoWorkspace() {
       isDemo
       members={demoMembers}
       messages={messages.filter(({ channelId }) => channelId === selectedChannel.id)}
+      onDeleteMessage={deleteMessage}
+      onEditMessage={editMessage}
       onSelectChannel={setSelectedChannel}
       onSendMessage={sendMessage}
       selectedChannel={selectedChannel}
@@ -95,6 +109,8 @@ function ConnectedWorkspace({ user }: { user: User }) {
       messages={workspace.messages}
       onSelectChannel={(channel) => workspace.setSelectedChannelId(channel.id)}
       onSendMessage={workspace.sendMessage}
+      onEditMessage={workspace.editMessage}
+      onDeleteMessage={workspace.deleteMessage}
       onRefreshInvite={workspace.refreshInvite}
       onRotateInvite={workspace.rotateInvite}
       currentPermissions={workspace.currentPermissions}
@@ -126,6 +142,8 @@ interface ConnectedWorkspaceReadyProps {
   messages: ChatMessage[]
   onSelectChannel: (channel: Channel) => void
   onSendMessage: (content: string) => Promise<void>
+  onEditMessage: (messageId: string, content: string) => Promise<void>
+  onDeleteMessage: (messageId: string) => Promise<void>
   onRefreshInvite: () => Promise<string>
   onRotateInvite: () => Promise<string>
   currentPermissions: ReturnType<typeof useCovilWorkspace>['currentPermissions']
@@ -152,6 +170,8 @@ function ConnectedWorkspaceReady({
   messages,
   onSelectChannel,
   onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
   onRefreshInvite,
   onRotateInvite,
   currentPermissions,
@@ -253,6 +273,8 @@ function ConnectedWorkspaceReady({
       onSelectChannel={selectChannel}
       onJoinVoiceChannel={joinVoiceChannel}
       onSendMessage={onSendMessage}
+      onEditMessage={onEditMessage}
+      onDeleteMessage={onDeleteMessage}
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
       onCreateChannel={onCreateChannel}

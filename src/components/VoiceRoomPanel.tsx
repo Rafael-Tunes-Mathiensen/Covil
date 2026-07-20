@@ -133,14 +133,16 @@ export function VoiceRoomPanel({
                       size="large"
                       speaking={isSpeaking}
                     />
-                    <span className="voice-person__signal" aria-hidden="true"><i /><i /><i /><i /></span>
                     {moderation?.serverMuted && <span className="voice-person__muted" title="Silenciado pela moderação"><MicOff size={14} /></span>}
                   </div>
-                  <strong>{participant.displayName}</strong>
+                  <span className="voice-person__signal" aria-hidden="true"><i /><i /><i /><i /></span>
+                  <span className="voice-person__name-line">
+                    <strong>{participant.displayName}</strong>
+                    {role && <span className="voice-person__role" style={{ '--role-color': role.color } as React.CSSProperties}><i />{role.name}</span>}
+                  </span>
                   <span className="voice-person__status">
                     {moderation?.serverMuted ? 'silenciado pelo moderador' : isSpeaking ? <><AudioLines size={13} /> falando</> : participant.id === currentUser.id ? 'você' : 'na voz'}
                   </span>
-                  {role && <span className="voice-person__role" style={{ '--role-color': role.color } as React.CSSProperties}><i />{role.name}</span>}
                   {canTarget && (
                     <ModerationControls
                       isMuted={moderation?.serverMuted ?? false}
