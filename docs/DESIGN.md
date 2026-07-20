@@ -25,6 +25,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 - Digitar `/` abre comandos com descrição; votação, roleta e dado usam diálogos focados e animações breves.
 - Cargos visuais aparecem como rótulos compactos junto aos nomes, sem sugerir uma permissão que não exista.
 - Formulários de cargos preservam fundo escuro, texto claro e amostras com a cor real escolhida; a gestão de membros reutiliza as fotos dos perfis.
+- O nome do Covil funciona como acesso discreto às configurações apenas quando o membro tem autorização; autores do chat usam botões transparentes e texto de alto contraste.
 - Ícones ativos, botões e estados de hover usam escala ou deslocamento mínimo para confirmar a ação.
 
 ## Movimento, som e acessibilidade

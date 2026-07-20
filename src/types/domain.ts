@@ -5,6 +5,7 @@ export const covilPermissions = [
   'manage_channels',
   'moderate_voice',
   'remove_members',
+  'manage_covil',
 ] as const
 export type CovilPermission = (typeof covilPermissions)[number]
 export type VoiceModerationAction = 'mute' | 'unmute' | 'disconnect'

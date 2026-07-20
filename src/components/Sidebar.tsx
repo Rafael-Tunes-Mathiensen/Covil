@@ -80,6 +80,7 @@ export function Sidebar({
   const textChannels = channels.filter(({ kind }) => kind === 'text')
   const voiceChannels = channels.filter(({ kind }) => kind === 'voice')
   const canReorderChannels = canManageChannels && Boolean(onReorderChannels)
+  const canOpenCovilSettings = canManageCovil && Boolean(onOpenCovilSettings)
 
   function startChannelDrag(event: DragEvent<HTMLButtonElement>, channel: Channel) {
     if (!canReorderChannels) return
@@ -157,7 +158,14 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar__brand"><BrandMark /></div>
-      <button className="covil-switcher" type="button">
+      <button
+        aria-label={canOpenCovilSettings ? `Configurações de ${covil.name}` : undefined}
+        className={`covil-switcher${canOpenCovilSettings ? ' is-actionable' : ''}`}
+        disabled={!canOpenCovilSettings}
+        onClick={canOpenCovilSettings ? onOpenCovilSettings : undefined}
+        title={canOpenCovilSettings ? 'Abrir configurações do Covil' : covil.name}
+        type="button"
+      >
         <span>{covil.name}</span><ChevronDown size={17} />
       </button>
 

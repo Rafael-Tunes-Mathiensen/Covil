@@ -67,7 +67,7 @@ habilitar confirmação de e-mail.
 | --- | --- | --- |
 | `profiles` | Nome, avatar e descrição ligados a `auth.users` | Visível ao próprio usuário e a pessoas que compartilham um Covil |
 | bucket `avatars` | Imagens públicas de perfil, até 2 MB | Cada usuário escreve e remove apenas na pasta do próprio UUID |
-| `covils` | Grupo privado e código de convite | Membros veem apenas os dados públicos; só o owner consulta ou renova o convite |
+| `covils` | Grupo privado e código de convite | Membros veem os dados; owner ou cargo com `manage_covil` altera o nome, mas só o owner consulta ou renova o convite |
 | `covil_members` | Participantes e papel `owner/member` | Visível aos membros do mesmo Covil |
 | `channels` | Canais `text` e `voice` | Membros leem; criação usa RPC e permissão; owner edita ou exclui |
 | `covil_roles` | Cargos com cor e permissões | Membros leem; só o owner cria, edita ou exclui |
@@ -139,7 +139,7 @@ await supabase.rpc('reorder_covil_channels', {
 
 Somente o owner administra os até 12 cargos do Covil. Um membro comum pode
 receber vários cargos, e sua permissão efetiva é a união de `manage_channels`,
-`moderate_voice` e `remove_members` presentes neles.
+`moderate_voice`, `remove_members` e `manage_covil` presentes neles.
 
 ```ts
 const { data: roleId } = await supabase.rpc('create_covil_role', {
@@ -160,13 +160,29 @@ await supabase.rpc('update_covil_role', {
   p_role_id: roleId,
   p_name: 'Sentinela',
   p_color: '#7A8CFF',
-  p_permissions: ['moderate_voice', 'manage_channels'],
+  p_permissions: ['moderate_voice', 'manage_channels', 'manage_covil'],
 })
 ```
 
 `delete_covil_role()` exclui o cargo e suas atribuições. O registro `owner` é a
 fonte exclusiva de propriedade: cargos não transferem ownership. O fundador
 pode receber cargos para exibição, mas continua com todas as permissões implícitas.
+
+### Alterar configurações gerais
+
+O nome do Covil pode ser atualizado pelo owner ou por um membro com `manage_covil`.
+A RPC normaliza o texto, exige entre 2 e 60 caracteres e valida a autorização no
+banco:
+
+```ts
+await supabase.rpc('update_covil_settings', {
+  p_covil_id: covilId,
+  p_name: 'Covil Renovado',
+})
+```
+
+Essa permissão não transfere ownership, não expõe o convite e não permite criar,
+editar ou atribuir cargos.
 
 ### Moderar voz e remover membros
 
@@ -333,7 +349,8 @@ para usuários autenticados que passam pelas policies acima.
 | Entrar em Covil | Somente pela RPC autenticada e com convite válido |
 | Lotação do Covil | Máximo de 6 memberships, garantido por trigger transacional |
 | Consultar/renovar convite | Somente o owner, pelas RPCs dedicadas |
-| Atualizar/excluir Covil | Owner; apenas `name` pode ser atualizado |
+| Atualizar nome do Covil | Pela RPC: owner ou cargo com `manage_covil`; apenas `name` é alterado |
+| Excluir Covil | Somente owner |
 | Sair/remover membro | Pela RPC: própria saída ou `remove_members`; fundador e app owner são protegidos |
 | Criar canal | Pela RPC: owner ou cargo com `manage_channels`; máximo de 25 por Covil |
 | Reordenar canais | Pela RPC: owner ou cargo com `manage_channels`; lista completa, sem IDs repetidos ou externos |

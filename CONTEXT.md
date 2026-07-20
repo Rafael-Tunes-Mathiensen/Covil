@@ -6,7 +6,7 @@
 - **Fundador**: único membro `owner` do Covil. Possui todas as permissões e não pode ser removido nem moderado por cargos delegados.
 - **Membro**: pessoa autenticada que pertence ao Covil como `member`.
 - **Cargo**: identidade nomeada e reutilizável, com cor própria, criada e atribuída pelo Fundador. Pode ser apenas visual ou também conceder permissões; um membro pode acumular vários cargos.
-- **Permissão**: capacidade operacional autorizada pelo banco. É opcional em um cargo e pode conceder `manage_channels`, `moderate_voice` ou `remove_members`.
+- **Permissão**: capacidade operacional autorizada pelo banco. É opcional em um cargo e pode conceder `manage_channels`, `moderate_voice`, `remove_members` ou `manage_covil`.
 - **Canal de texto**: espaço persistente para mensagens.
 - **Canal de voz**: sala WebRTC independente para voz e compartilhamento de tela.
 - **Sala observada**: canal de voz aberto na área principal apenas para consultar seus ocupantes, sem alterar a chamada ativa.
@@ -18,6 +18,7 @@
 - Somente o Fundador cria, exclui e atribui cargos; os cargos delegam ações operacionais, não o controle dos próprios cargos.
 - As permissões efetivas de um membro são a união das permissões de todos os cargos atribuídos a ele.
 - Um cargo sem permissões continua válido e visível ao lado do nome do membro.
+- `manage_covil` permite alterar configurações gerais, como o nome, mas não transfere a propriedade nem permite administrar cargos.
 - Nenhum cargo pode remover, silenciar ou desconectar o Fundador.
 - Um silêncio imposto nunca liga o microfone de alguém. A ação de liberar apenas devolve ao participante o controle do próprio microfone.
 - Selecionar uma sala apenas a observa. Somente a ação de entrar nela encerra a sessão WebRTC anterior e inicia a nova chamada.

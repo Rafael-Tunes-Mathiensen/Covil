@@ -18,6 +18,26 @@ const channels: Channel[] = [
 ]
 
 describe('Sidebar', () => {
+  it('abre as configurações ao clicar no nome do Covil quando autorizado', () => {
+    const onOpenCovilSettings = vi.fn()
+    render(
+      <Sidebar
+        canManageCovil
+        channels={channels}
+        covil={covil}
+        currentChannelId="geral"
+        currentUser={currentUser}
+        onOpenCovilSettings={onOpenCovilSettings}
+        onSelectChannel={vi.fn()}
+        voiceChannelId={null}
+        voiceStatus="idle"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Configurações de Meu Covil' }))
+    expect(onOpenCovilSettings).toHaveBeenCalledTimes(1)
+  })
+
   it('permite arrastar canais do mesmo tipo para reordená-los', () => {
     const onReorderChannels = vi.fn(async () => undefined)
     render(

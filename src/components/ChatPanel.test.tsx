@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatPanel } from './ChatPanel'
 import type { Channel, ChatMessage, CovilRole, MemberRoleAssignment, Profile } from '../types/domain'
+import styles from '../styles/index.css?raw'
 
 const channel: Channel = {
   id: 'general',
@@ -66,6 +67,15 @@ function renderChat(overrides: Partial<React.ComponentProps<typeof ChatPanel>> =
 }
 
 describe('ChatPanel', () => {
+  it('mantém o nome do autor legível sobre o fundo escuro do chat', () => {
+    renderChat()
+
+    const author = screen.getByRole('button', { name: 'Nina' })
+    expect(author).toHaveClass('message__author')
+
+    expect(styles).toMatch(/\.message__author\s*\{[^}]*background:\s*transparent;/s)
+  })
+
   it('oferece menções e destaca quando o usuário atual foi marcado', () => {
     renderChat()
 

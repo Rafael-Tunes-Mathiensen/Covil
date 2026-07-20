@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Check, Pencil, Radio, ShieldCheck, Trash2, UserMinus, UsersRound, Wrench, X } from 'lucide-react'
+import { Check, Pencil, Radio, Settings2, ShieldCheck, Trash2, UserMinus, UsersRound, Wrench, X } from 'lucide-react'
 import {
   covilPermissions,
+  type Covil,
   type CovilPermission,
   type CovilRole,
   type MemberRoleAssignment,
@@ -12,7 +13,9 @@ import { Dialog } from './Dialog'
 
 interface CovilSettingsDialogProps {
   assignments: readonly MemberRoleAssignment[]
+  canManageCovil: boolean
   canRemoveMembers: boolean
+  covil: Covil
   currentUser: Profile
   isSubmitting: boolean
   members: readonly Profile[]
@@ -22,10 +25,15 @@ interface CovilSettingsDialogProps {
   onDeleteRole: (roleId: string) => Promise<unknown>
   onRemoveMember: (userId: string) => Promise<unknown>
   onSetMemberRole: (userId: string, roleId: string, assigned: boolean) => Promise<unknown>
+  onUpdateCovilName: (name: string) => Promise<unknown>
   onUpdateRole: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
 }
 
 const permissionCopy: Record<CovilPermission, { label: string; description: string }> = {
+  manage_covil: {
+    label: 'Gerenciar o Covil',
+    description: 'Alterar o nome e as configurações gerais do Covil.',
+  },
   manage_channels: {
     label: 'Criar canais',
     description: 'Criar novos canais de texto e salas de voz.',
@@ -44,12 +52,21 @@ const roleColors = ['#ff7043', '#7a8cff', '#55c98a', '#d58cff', '#e8b35d']
 
 export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
   const isOwner = props.currentUser.role === 'owner'
-  const [tab, setTab] = useState<'roles' | 'members'>(isOwner ? 'roles' : 'members')
+  const [tab, setTab] = useState<'general' | 'roles' | 'members'>(
+    props.canManageCovil ? 'general' : isOwner ? 'roles' : 'members',
+  )
+  const tabs = [
+    ...(props.canManageCovil ? ['general'] as const : []),
+    ...(isOwner ? ['roles'] as const : []),
+    'members' as const,
+  ]
 
   function handleTabKey(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (!isOwner || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
     event.preventDefault()
-    const nextTab = tab === 'roles' ? 'members' : 'roles'
+    const currentIndex = tabs.indexOf(tab)
+    const direction = event.key === 'ArrowRight' ? 1 : -1
+    const nextTab = tabs[(currentIndex + direction + tabs.length) % tabs.length]
     setTab(nextTab)
     requestAnimationFrame(() => document.getElementById(`covil-tab-${nextTab}`)?.focus())
   }
@@ -59,9 +76,22 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
       className="covil-settings"
       eyebrow="CONTROLE DO COVIL"
       onClose={props.onClose}
-      title="Cargos e membros"
+      title="Configurações do Covil"
     >
       <div className="settings-tabs" onKeyDown={handleTabKey} role="tablist" aria-label="Configurações do Covil">
+        {props.canManageCovil && (
+          <button
+            aria-selected={tab === 'general'}
+            aria-controls="covil-panel-general"
+            className={tab === 'general' ? 'is-active' : ''}
+            id="covil-tab-general"
+            onClick={() => setTab('general')}
+            role="tab"
+            type="button"
+          >
+            <Settings2 size={17} /> Geral
+          </button>
+        )}
         {isOwner && (
           <button
             aria-selected={tab === 'roles'}
@@ -94,9 +124,61 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
         id={`covil-panel-${tab}`}
         role="tabpanel"
       >
-        {tab === 'roles' && isOwner ? <RolesPane {...props} /> : <MembersPane {...props} />}
+        {tab === 'general' && props.canManageCovil
+          ? <GeneralPane {...props} />
+          : tab === 'roles' && isOwner
+            ? <RolesPane {...props} />
+            : <MembersPane {...props} />}
       </div>
     </Dialog>
+  )
+}
+
+function GeneralPane({ covil, isSubmitting, onUpdateCovilName }: CovilSettingsDialogProps) {
+  const [name, setName] = useState(covil.name)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const normalizedName = name.trim()
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (normalizedName.length < 2 || normalizedName.length > 60 || isSubmitting) return
+    setError(null)
+    setSuccess(null)
+    try {
+      await onUpdateCovilName(normalizedName)
+      setSuccess('Nome do Covil atualizado.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar o Covil.')
+    }
+  }
+
+  return (
+    <section className="settings-section covil-general-settings">
+      <header>
+        <div><Settings2 size={18} /><span><strong>Identidade do Covil</strong><small>O novo nome aparece para todos os membros em tempo real.</small></span></div>
+      </header>
+      <form className="covil-general-form" onSubmit={save}>
+        <label className="field-label" htmlFor="covil-name">Nome do Covil</label>
+        <input
+          id="covil-name"
+          maxLength={60}
+          minLength={2}
+          onChange={(event) => setName(event.target.value)}
+          value={name}
+        />
+        <small>{normalizedName.length}/60 caracteres</small>
+        {error && <p className="dialog-error" role="alert">{error}</p>}
+        {success && <p className="dialog-success" role="status">{success}</p>}
+        <button
+          className="primary-button primary-button--compact"
+          disabled={normalizedName.length < 2 || normalizedName.length > 60 || normalizedName === covil.name || isSubmitting}
+          type="submit"
+        >
+          <Check size={17} /> Salvar alterações
+        </button>
+      </form>
+    </section>
   )
 }
 

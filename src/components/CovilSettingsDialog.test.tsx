@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { CovilSettingsDialog } from './CovilSettingsDialog'
 import type { CovilRole, Profile } from '../types/domain'
 
+const covil = { id: 'covil', inviteCode: '', name: 'Meu Covil' }
+
 const owner: Profile = {
   id: 'owner',
   displayName: 'Tuneco',
@@ -27,7 +29,9 @@ describe('CovilSettingsDialog', () => {
     render(
       <CovilSettingsDialog
         assignments={[]}
+        canManageCovil
         canRemoveMembers
+        covil={covil}
         currentUser={owner}
         isSubmitting={false}
         members={[owner]}
@@ -37,10 +41,12 @@ describe('CovilSettingsDialog', () => {
         onDeleteRole={vi.fn(async () => undefined)}
         onRemoveMember={vi.fn(async () => undefined)}
         onSetMemberRole={vi.fn(async () => undefined)}
+        onUpdateCovilName={vi.fn(async () => undefined)}
         roles={[]}
       />,
     )
 
+    fireEvent.click(screen.getByRole('tab', { name: /Cargos/ }))
     fireEvent.change(screen.getByLabelText('Nome do cargo'), { target: { value: 'Raider' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar cargo' }))
 
@@ -53,7 +59,9 @@ describe('CovilSettingsDialog', () => {
     render(
       <CovilSettingsDialog
         assignments={[]}
+        canManageCovil
         canRemoveMembers
+        covil={covil}
         currentUser={owner}
         isSubmitting={false}
         members={[owner]}
@@ -62,11 +70,13 @@ describe('CovilSettingsDialog', () => {
         onDeleteRole={vi.fn(async () => undefined)}
         onRemoveMember={vi.fn(async () => undefined)}
         onSetMemberRole={onSetMemberRole}
+        onUpdateCovilName={vi.fn(async () => undefined)}
         onUpdateRole={onUpdateRole}
         roles={[moderatorRole]}
       />,
     )
 
+    fireEvent.click(screen.getByRole('tab', { name: /Cargos/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Editar cargo Guardião' }))
     fireEvent.change(screen.getByLabelText('Editar nome do cargo'), { target: { value: 'Sentinela' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salvar cargo' }))
@@ -86,7 +96,9 @@ describe('CovilSettingsDialog', () => {
     render(
       <CovilSettingsDialog
         assignments={[]}
+        canManageCovil
         canRemoveMembers
+        covil={covil}
         currentUser={owner}
         isSubmitting={false}
         members={[owner]}
@@ -95,6 +107,7 @@ describe('CovilSettingsDialog', () => {
         onDeleteRole={vi.fn(async () => undefined)}
         onRemoveMember={vi.fn(async () => undefined)}
         onSetMemberRole={vi.fn(async () => undefined)}
+        onUpdateCovilName={vi.fn(async () => undefined)}
         onUpdateRole={vi.fn(async () => undefined)}
         roles={[]}
       />,
@@ -102,5 +115,34 @@ describe('CovilSettingsDialog', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: /Membros/ }))
     expect(screen.getByTitle('Tuneco').querySelector('img')).toHaveAttribute('src', owner.avatarUrl)
+  })
+
+  it('permite alterar o nome do Covil pela aba geral', async () => {
+    const onUpdateCovilName = vi.fn(async () => undefined)
+    render(
+      <CovilSettingsDialog
+        assignments={[]}
+        canManageCovil
+        canRemoveMembers
+        covil={covil}
+        currentUser={owner}
+        isSubmitting={false}
+        members={[owner]}
+        onClose={vi.fn()}
+        onCreateRole={vi.fn(async () => undefined)}
+        onDeleteRole={vi.fn(async () => undefined)}
+        onRemoveMember={vi.fn(async () => undefined)}
+        onSetMemberRole={vi.fn(async () => undefined)}
+        onUpdateCovilName={onUpdateCovilName}
+        onUpdateRole={vi.fn(async () => undefined)}
+        roles={[]}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Nome do Covil'), { target: { value: 'Covil Renovado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    await waitFor(() => expect(onUpdateCovilName).toHaveBeenCalledWith('Covil Renovado'))
+    expect(screen.getByRole('status')).toHaveTextContent('Nome do Covil atualizado.')
   })
 })

@@ -155,6 +155,7 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
       onVotePoll={workspace.votePoll}
       onRefreshInvite={workspace.refreshInvite}
       onRotateInvite={workspace.rotateInvite}
+      onUpdateCovilName={workspace.updateCovilName}
       currentPermissions={workspace.currentPermissions}
       roles={workspace.roles}
       memberRoleAssignments={workspace.memberRoleAssignments}
@@ -200,6 +201,7 @@ interface ConnectedWorkspaceReadyProps {
   onVotePoll: ReturnType<typeof useCovilWorkspace>['votePoll']
   onRefreshInvite: () => Promise<string>
   onRotateInvite: () => Promise<string>
+  onUpdateCovilName: ReturnType<typeof useCovilWorkspace>['updateCovilName']
   currentPermissions: ReturnType<typeof useCovilWorkspace>['currentPermissions']
   roles: ReturnType<typeof useCovilWorkspace>['roles']
   memberRoleAssignments: ReturnType<typeof useCovilWorkspace>['memberRoleAssignments']
@@ -240,6 +242,7 @@ function ConnectedWorkspaceReady({
   onVotePoll,
   onRefreshInvite,
   onRotateInvite,
+  onUpdateCovilName,
   currentPermissions,
   roles,
   memberRoleAssignments,
@@ -358,6 +361,7 @@ function ConnectedWorkspaceReady({
       onVotePoll={onVotePoll}
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
+      onUpdateCovilName={onUpdateCovilName}
       onCreateChannel={onCreateChannel}
       onReorderChannels={onReorderChannels}
       onCreateRole={onCreateRole}

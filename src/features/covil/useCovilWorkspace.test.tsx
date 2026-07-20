@@ -17,7 +17,7 @@ interface FakeWorkspaceState {
     covil_id: string
     name: string
     color: string
-    permissions: Array<'manage_channels' | 'moderate_voice' | 'remove_members'>
+    permissions: Array<'manage_channels' | 'moderate_voice' | 'remove_members' | 'manage_covil'>
     position: number
   }>
   assignments: Array<{ covil_id: string; user_id: string; role_id: string }>
@@ -337,6 +337,19 @@ describe('useCovilWorkspace', () => {
       p_covil_id: covilId,
       p_kind: 'text',
       p_name: 'estratégia',
+    })
+  })
+
+  it('atualiza o nome do Covil pelo RPC autorizado', async () => {
+    const fake = createFakeClient({ currentRole: 'owner' })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await act(() => result.current.updateCovilName('  Covil Renovado  '))
+
+    expect(fake.rpc).toHaveBeenCalledWith('update_covil_settings', {
+      p_covil_id: covilId,
+      p_name: 'Covil Renovado',
     })
   })
 

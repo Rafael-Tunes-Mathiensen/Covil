@@ -27,7 +27,8 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
 - compartilhamento de tela em 720p/30 fps, áudio quando permitido pelo navegador, foco alternável sem esconder os participantes e tela cheia nativa;
 - chamada com dock arrastável, posição persistente e modo compacto, além de moderação disponível tanto na sala quanto no painel lateral;
-- até 12 cargos acumuláveis e editáveis, inclusive cargos apenas visuais e autoatribuição pelo owner, com permissões opcionais para criar canais, moderar voz ou remover membros;
+- até 12 cargos acumuláveis e editáveis, inclusive cargos apenas visuais e autoatribuição pelo owner, com permissões opcionais para criar canais, moderar voz, remover membros ou gerenciar configurações gerais;
+- nome do Covil clicável para owner e cargos autorizados, com renomeação sincronizada em tempo real;
 - mute persistente e desconexão cooperativa da chamada, sem permitir moderar o fundador;
 - políticas RLS e RPCs autorizadas no PostgreSQL;
 - animações responsivas, diálogos acessíveis e efeitos sonoros sintetizados que podem ser desativados;

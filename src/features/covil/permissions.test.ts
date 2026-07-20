@@ -8,7 +8,7 @@ const roles: CovilRole[] = [
     covilId: 'covil',
     name: 'Arquiteto',
     color: '#ff7043',
-    permissions: ['manage_channels'],
+    permissions: ['manage_channels', 'manage_covil'],
     position: 0,
   },
   {
@@ -32,6 +32,7 @@ describe('permissões do Covil', () => {
       'manage_channels',
       'moderate_voice',
       'remove_members',
+      'manage_covil',
     ])
   })
 
@@ -42,8 +43,10 @@ describe('permissões do Covil', () => {
       'manage_channels',
       'moderate_voice',
       'remove_members',
+      'manage_covil',
     ])
     expect(hasCovilPermission(permissions, 'moderate_voice')).toBe(true)
+    expect(hasCovilPermission(permissions, 'manage_covil')).toBe(true)
   })
 
   it('não concede capacidades sem um cargo correspondente', () => {

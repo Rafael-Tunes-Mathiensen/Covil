@@ -644,6 +644,18 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     })
   }
 
+  async function updateCovilName(name: string) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    const nextName = name.trim()
+    if (nextName.length < 2 || nextName.length > 60) {
+      throw new Error('O nome do Covil deve ter entre 2 e 60 caracteres.')
+    }
+    return mutateWorkspace('update_covil_settings', {
+      p_covil_id: covil.id,
+      p_name: nextName,
+    })
+  }
+
   async function reorderChannels(kind: ChannelKind, channelIds: string[]) {
     if (!covil) throw new Error('Nenhum Covil está selecionado.')
     const currentIds = channels.filter((channel) => channel.kind === kind).map(({ id }) => id)
@@ -865,6 +877,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     deleteMessage,
     refreshInvite,
     rotateInvite,
+    updateCovilName,
     createChannel,
     reorderChannels,
     createRole,

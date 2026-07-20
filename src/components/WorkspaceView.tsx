@@ -49,6 +49,7 @@ interface WorkspaceViewProps {
   onSignOut?: () => void
   onRefreshInvite?: () => Promise<string>
   onRotateInvite?: () => Promise<string>
+  onUpdateCovilName?: (name: string) => Promise<unknown>
   admin?: AdminConsoleState
   currentPermissions?: readonly CovilPermission[]
   roles?: readonly CovilRole[]
@@ -94,6 +95,7 @@ export function WorkspaceView({
   onSignOut,
   onRefreshInvite,
   onRotateInvite,
+  onUpdateCovilName,
   admin,
   currentPermissions = [],
   roles = [],
@@ -131,7 +133,8 @@ export function WorkspaceView({
   const canManageChannels = hasCovilPermission(currentPermissions, 'manage_channels')
   const canModerateVoice = hasCovilPermission(currentPermissions, 'moderate_voice')
   const canRemoveMembers = hasCovilPermission(currentPermissions, 'remove_members')
-  const canManageCovil = currentUser.role === 'owner' || canRemoveMembers
+  const canManageCovilDetails = hasCovilPermission(currentPermissions, 'manage_covil')
+  const canOpenCovilSettings = currentUser.role === 'owner' || canManageCovilDetails || canRemoveMembers
   const selectedProfile = selectedProfileId === currentUser.id
     ? currentUser
     : members.find(({ id }) => id === selectedProfileId)
@@ -202,7 +205,7 @@ export function WorkspaceView({
         isAppAdmin={admin?.isAdmin ?? false}
         onOpenAdmin={() => setShowAdmin(true)}
         canManageChannels={canManageChannels}
-        canManageCovil={canManageCovil && Boolean(onRemoveMember)}
+        canManageCovil={canOpenCovilSettings}
         onCreateChannel={onCreateChannel ? setCreateChannelKind : undefined}
         onReorderChannels={onReorderChannels}
         onOpenCovilSettings={() => setShowCovilSettings(true)}
@@ -301,10 +304,12 @@ export function WorkspaceView({
           onCreate={onCreateChannel}
         />
       )}
-      {showCovilSettings && onCreateRole && onUpdateRole && onDeleteRole && onSetMemberRole && onRemoveMember && (
+      {showCovilSettings && onCreateRole && onUpdateRole && onDeleteRole && onSetMemberRole && onRemoveMember && onUpdateCovilName && (
         <CovilSettingsDialog
           assignments={memberRoleAssignments}
+          canManageCovil={canManageCovilDetails}
           canRemoveMembers={canRemoveMembers}
+          covil={covil}
           currentUser={currentUser}
           isSubmitting={isSubmitting}
           members={members}
@@ -314,6 +319,7 @@ export function WorkspaceView({
           onDeleteRole={onDeleteRole}
           onRemoveMember={onRemoveMember}
           onSetMemberRole={onSetMemberRole}
+          onUpdateCovilName={onUpdateCovilName}
           roles={roles}
         />
       )}
