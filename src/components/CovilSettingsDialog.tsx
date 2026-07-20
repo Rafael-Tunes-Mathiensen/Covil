@@ -329,7 +329,7 @@ function MembersPane({
       <div className="settings-member-list">
         {members.map((member) => (
           <article className="settings-member" key={member.id}>
-            <Avatar color={member.avatarColor} name={member.displayName} size="medium" status={member.status} />
+            <Avatar color={member.avatarColor} imageUrl={member.avatarUrl} name={member.displayName} size="medium" status={member.status} />
             <div className="settings-member__identity">
               <strong>{member.displayName}</strong>
               <small>{member.role === 'owner' ? 'Fundador · acesso total' : 'Membro do Covil'}</small>

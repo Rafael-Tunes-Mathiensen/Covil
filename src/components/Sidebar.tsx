@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, type DragEvent } from 'react'
 import {
   ChevronDown,
   Copy,
   Hash,
   Headphones,
+  GripVertical,
   LogOut,
   Plus,
   RefreshCw,
@@ -35,6 +36,7 @@ interface SidebarProps {
   canManageChannels?: boolean
   canManageCovil?: boolean
   onCreateChannel?: (kind: ChannelKind) => void
+  onReorderChannels?: (kind: ChannelKind, channelIds: string[]) => void | Promise<unknown>
   onOpenCovilSettings?: () => void
   soundsEnabled?: boolean
   onToggleSounds?: () => void
@@ -61,6 +63,7 @@ export function Sidebar({
   canManageChannels = false,
   canManageCovil = false,
   onCreateChannel,
+  onReorderChannels,
   onOpenCovilSettings,
   soundsEnabled = true,
   onToggleSounds,
@@ -72,8 +75,52 @@ export function Sidebar({
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [isCopyingInvite, setIsCopyingInvite] = useState(false)
   const [isRotatingInvite, setIsRotatingInvite] = useState(false)
+  const [draggedChannel, setDraggedChannel] = useState<Channel | null>(null)
+  const [dragOverChannelId, setDragOverChannelId] = useState<string | null>(null)
   const textChannels = channels.filter(({ kind }) => kind === 'text')
   const voiceChannels = channels.filter(({ kind }) => kind === 'voice')
+  const canReorderChannels = canManageChannels && Boolean(onReorderChannels)
+
+  function startChannelDrag(event: DragEvent<HTMLButtonElement>, channel: Channel) {
+    if (!canReorderChannels) return
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', channel.id)
+    setDraggedChannel(channel)
+  }
+
+  function dragOverChannel(event: DragEvent<HTMLButtonElement>, channel: Channel) {
+    if (!draggedChannel || draggedChannel.kind !== channel.kind) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverChannelId(channel.id)
+  }
+
+  function dropChannel(event: DragEvent<HTMLButtonElement>, target: Channel) {
+    event.preventDefault()
+    if (!draggedChannel || draggedChannel.kind !== target.kind || !onReorderChannels) return
+    const ordered = channels.filter(({ kind }) => kind === target.kind)
+    const sourceIndex = ordered.findIndex(({ id }) => id === draggedChannel.id)
+    const targetIndex = ordered.findIndex(({ id }) => id === target.id)
+    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex !== targetIndex) {
+      const next = [...ordered]
+      const [moved] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, moved)
+      void Promise.resolve(onReorderChannels(target.kind, next.map(({ id }) => id))).catch(() => undefined)
+    }
+    setDraggedChannel(null)
+    setDragOverChannelId(null)
+  }
+
+  function finishChannelDrag() {
+    setDraggedChannel(null)
+    setDragOverChannelId(null)
+  }
+
+  function channelDragClass(channel: Channel) {
+    if (draggedChannel?.id === channel.id) return ' is-dragging'
+    if (dragOverChannelId === channel.id) return ' is-drag-over'
+    return ''
+  }
 
   async function copyInvite() {
     if (isCopyingInvite) return
@@ -122,13 +169,20 @@ export function Sidebar({
         >
           {textChannels.map((channel) => (
             <button
-              className={`channel${currentChannelId === channel.id ? ' is-active' : ''}`}
+              className={`channel${currentChannelId === channel.id ? ' is-active' : ''}${channelDragClass(channel)}`}
               key={channel.id}
               aria-label={`Canal de texto ${channel.name}`}
+              draggable={canReorderChannels}
+              onDragEnd={finishChannelDrag}
+              onDragOver={(event) => dragOverChannel(event, channel)}
+              onDragStart={(event) => startChannelDrag(event, channel)}
+              onDrop={(event) => dropChannel(event, channel)}
               onClick={() => onSelectChannel(channel)}
+              title={canReorderChannels ? 'Arraste para reordenar' : undefined}
               type="button"
             >
               <Hash size={18} /><span>{channel.name}</span>
+              {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
             </button>
           ))}
         </ChannelSection>
@@ -144,13 +198,20 @@ export function Sidebar({
             return (
               <div className="voice-channel-entry" key={channel.id}>
                 <button
-                  className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}`}
+                  className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}${channelDragClass(channel)}`}
                   aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
+                  draggable={canReorderChannels}
+                  onDragEnd={finishChannelDrag}
+                  onDragOver={(event) => dragOverChannel(event, channel)}
+                  onDragStart={(event) => startChannelDrag(event, channel)}
+                  onDrop={(event) => dropChannel(event, channel)}
                   onClick={() => onSelectChannel(channel)}
+                  title={canReorderChannels ? 'Arraste para reordenar' : undefined}
                   type="button"
                 >
                   {isConnected ? <Headphones size={18} /> : <Volume2 size={18} />}
                   <span>{channel.name}</span>
+                  {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
                   {participants.length > 0 && (
                     <small className="channel__count">{participants.length}</small>
                   )}

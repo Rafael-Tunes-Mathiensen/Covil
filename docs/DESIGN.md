@@ -16,12 +16,15 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
 - Selecionar uma sala de voz permite inspecionar seus ocupantes sem interromper a chamada mantida no dock; entrar nela é uma ação explícita.
+- O dock da chamada pode ser arrastado dentro da área principal e reduzido a um único controle compacto; posição e estado minimizado permanecem no dispositivo.
+- Quem possui `manage_channels` pode arrastar canais dentro da seção de texto ou voz; realce e opacidade indicam origem e destino sem acrescentar controles permanentes.
 - O contorno do avatar e uma pequena forma de onda entre a foto e o nome respondem somente enquanto o detector local identifica fala.
 - O compartilhamento de tela expande a área principal, mas mantém participantes e moderação em uma coluna; a pessoa alterna entre foco na tela, foco no grupo e tela cheia nativa.
 - Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.
 - Ações de editar ou excluir aparecem no hover e no foco da própria mensagem; menções são sugeridas acima do compositor, destacadas no fluxo e notificadas por um aviso curto.
 - Digitar `/` abre comandos com descrição; votação, roleta e dado usam diálogos focados e animações breves.
 - Cargos visuais aparecem como rótulos compactos junto aos nomes, sem sugerir uma permissão que não exista.
+- Formulários de cargos preservam fundo escuro, texto claro e amostras com a cor real escolhida; a gestão de membros reutiliza as fotos dos perfis.
 - Ícones ativos, botões e estados de hover usam escala ou deslocamento mínimo para confirmar a ação.
 
 ## Movimento, som e acessibilidade

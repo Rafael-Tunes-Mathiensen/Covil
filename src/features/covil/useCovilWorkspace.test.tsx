@@ -339,4 +339,24 @@ describe('useCovilWorkspace', () => {
       p_name: 'estratégia',
     })
   })
+
+  it('persiste a nova ordem dos canais pelo RPC autorizado', async () => {
+    const fake = createFakeClient({
+      currentRole: 'owner',
+      channels: [
+        { id: 'geral', covil_id: covilId, name: 'geral', kind: 'text', position: 0 },
+        { id: 'codigos', covil_id: covilId, name: 'códigos', kind: 'text', position: 1 },
+      ],
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await act(() => result.current.reorderChannels('text', ['codigos', 'geral']))
+
+    expect(fake.rpc).toHaveBeenCalledWith('reorder_covil_channels', {
+      p_channel_ids: ['codigos', 'geral'],
+      p_covil_id: covilId,
+      p_kind: 'text',
+    })
+  })
 })

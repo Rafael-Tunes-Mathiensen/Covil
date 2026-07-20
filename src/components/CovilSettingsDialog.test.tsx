@@ -7,6 +7,7 @@ const owner: Profile = {
   id: 'owner',
   displayName: 'Tuneco',
   avatarColor: '#7a8cff',
+  avatarUrl: 'https://example.com/tuneco.png',
   status: 'online',
   role: 'owner',
 }
@@ -79,5 +80,27 @@ describe('CovilSettingsDialog', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Membros/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Guardião' }))
     await waitFor(() => expect(onSetMemberRole).toHaveBeenCalledWith('owner', 'moderator', true))
+  })
+
+  it('mostra a foto de perfil dos membros na gestão', () => {
+    render(
+      <CovilSettingsDialog
+        assignments={[]}
+        canRemoveMembers
+        currentUser={owner}
+        isSubmitting={false}
+        members={[owner]}
+        onClose={vi.fn()}
+        onCreateRole={vi.fn(async () => undefined)}
+        onDeleteRole={vi.fn(async () => undefined)}
+        onRemoveMember={vi.fn(async () => undefined)}
+        onSetMemberRole={vi.fn(async () => undefined)}
+        onUpdateRole={vi.fn(async () => undefined)}
+        roles={[]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: /Membros/ }))
+    expect(screen.getByTitle('Tuneco').querySelector('img')).toHaveAttribute('src', owner.avatarUrl)
   })
 })

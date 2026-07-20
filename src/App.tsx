@@ -161,6 +161,7 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
       voiceModerationStates={workspace.voiceModerationStates}
       isSubmitting={workspace.isSubmitting}
       onCreateChannel={workspace.createChannel}
+      onReorderChannels={workspace.reorderChannels}
       onCreateRole={workspace.createRole}
       onUpdateRole={workspace.updateRole}
       onDeleteRole={workspace.deleteRole}
@@ -205,6 +206,7 @@ interface ConnectedWorkspaceReadyProps {
   voiceModerationStates: ReturnType<typeof useCovilWorkspace>['voiceModerationStates']
   isSubmitting: boolean
   onCreateChannel: ReturnType<typeof useCovilWorkspace>['createChannel']
+  onReorderChannels: ReturnType<typeof useCovilWorkspace>['reorderChannels']
   onCreateRole: ReturnType<typeof useCovilWorkspace>['createRole']
   onUpdateRole: ReturnType<typeof useCovilWorkspace>['updateRole']
   onDeleteRole: ReturnType<typeof useCovilWorkspace>['deleteRole']
@@ -244,6 +246,7 @@ function ConnectedWorkspaceReady({
   voiceModerationStates,
   isSubmitting,
   onCreateChannel,
+  onReorderChannels,
   onCreateRole,
   onUpdateRole,
   onDeleteRole,
@@ -356,6 +359,7 @@ function ConnectedWorkspaceReady({
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
       onCreateChannel={onCreateChannel}
+      onReorderChannels={onReorderChannels}
       onCreateRole={onCreateRole}
       onUpdateRole={onUpdateRole}
       onDeleteRole={onDeleteRole}

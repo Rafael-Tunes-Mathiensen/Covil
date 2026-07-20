@@ -22,11 +22,11 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - criação de grupo privado e entrada por convite de uso único;
 - mensagens em tempo real com menções notificadas, edição, exclusão, votações, roleta e dado;
 - perfis com nome, foto, descrição e troca de senha, visíveis apenas entre membros do mesmo Covil;
-- canais de texto e salas de voz criados pelo owner ou por cargos autorizados, até o limite de 25 canais;
+- canais de texto e salas de voz criados e reordenados por arrastar pelo owner ou por cargos autorizados, até o limite de 25 canais;
 - chamadas mesh para até seis participantes, com ocupantes visíveis por sala e inspeção sem abandonar a chamada atual;
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
 - compartilhamento de tela em 720p/30 fps, áudio quando permitido pelo navegador, foco alternável sem esconder os participantes e tela cheia nativa;
-- chamada minimizável e moderação disponível tanto na sala quanto no painel lateral;
+- chamada com dock arrastável, posição persistente e modo compacto, além de moderação disponível tanto na sala quanto no painel lateral;
 - até 12 cargos acumuláveis e editáveis, inclusive cargos apenas visuais e autoatribuição pelo owner, com permissões opcionais para criar canais, moderar voz ou remover membros;
 - mute persistente e desconexão cooperativa da chamada, sem permitir moderar o fundador;
 - políticas RLS e RPCs autorizadas no PostgreSQL;

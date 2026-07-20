@@ -123,6 +123,18 @@ const { data: channelId, error } = await supabase.rpc('create_covil_channel', {
 })
 ```
 
+A mesma permissão pode persistir uma nova ordem dentro de uma seção. A RPC exige
+todos os IDs daquele tipo exatamente uma vez, impedindo mover ou omitir canais
+de outro Covil:
+
+```ts
+await supabase.rpc('reorder_covil_channels', {
+  p_covil_id: covilId,
+  p_kind: 'text',
+  p_channel_ids: ['uuid-codigos', 'uuid-geral'],
+})
+```
+
 ### Criar e atribuir cargos
 
 Somente o owner administra os até 12 cargos do Covil. Um membro comum pode
@@ -324,6 +336,7 @@ para usuários autenticados que passam pelas policies acima.
 | Atualizar/excluir Covil | Owner; apenas `name` pode ser atualizado |
 | Sair/remover membro | Pela RPC: própria saída ou `remove_members`; fundador e app owner são protegidos |
 | Criar canal | Pela RPC: owner ou cargo com `manage_channels`; máximo de 25 por Covil |
+| Reordenar canais | Pela RPC: owner ou cargo com `manage_channels`; lista completa, sem IDs repetidos ou externos |
 | Editar/excluir canal | Owner do Covil |
 | Ler cargos e atribuições | Membro do mesmo Covil |
 | Criar/editar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis; owner pode se autoatribuir |

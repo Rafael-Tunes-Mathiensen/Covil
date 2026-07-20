@@ -644,6 +644,45 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     })
   }
 
+  async function reorderChannels(kind: ChannelKind, channelIds: string[]) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    const currentIds = channels.filter((channel) => channel.kind === kind).map(({ id }) => id)
+    const expectedIds = new Set(currentIds)
+    if (
+      channelIds.length !== currentIds.length ||
+      new Set(channelIds).size !== channelIds.length ||
+      channelIds.some((id) => !expectedIds.has(id))
+    ) {
+      throw new Error('A ordem dos canais está incompleta ou inválida.')
+    }
+
+    const previousChannels = channels
+    const byId = new Map(channels.map((channel) => [channel.id, channel]))
+    const reordered = channelIds.map((id, position) => ({ ...byId.get(id)!, position }))
+    let nextIndex = 0
+    setChannels((current) => current.map((channel) => (
+      channel.kind === kind ? reordered[nextIndex++] : channel
+    )))
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const result = await client.rpc('reorder_covil_channels', {
+        p_covil_id: covil.id,
+        p_kind: kind,
+        p_channel_ids: channelIds,
+      })
+      if (result.error) throw result.error
+      await loadWorkspace(false)
+    } catch (cause) {
+      setChannels(previousChannels)
+      const message = getErrorMessage(cause)
+      setError(message)
+      throw new Error(message, { cause })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   async function createRole(name: string, color: string, permissions: CovilPermission[]) {
     if (!covil) throw new Error('Nenhum Covil está selecionado.')
     return mutateWorkspace('create_covil_role', {
@@ -827,6 +866,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     refreshInvite,
     rotateInvite,
     createChannel,
+    reorderChannels,
     createRole,
     updateRole,
     deleteRole,

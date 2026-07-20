@@ -56,6 +56,7 @@ interface WorkspaceViewProps {
   voiceModerationStates?: readonly VoiceModerationState[]
   isSubmitting?: boolean
   onCreateChannel?: (name: string, kind: ChannelKind) => Promise<unknown>
+  onReorderChannels?: (kind: ChannelKind, channelIds: string[]) => Promise<unknown>
   onCreateRole?: (name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
   onUpdateRole?: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
   onDeleteRole?: (roleId: string) => Promise<unknown>
@@ -100,6 +101,7 @@ export function WorkspaceView({
   voiceModerationStates = [],
   isSubmitting = false,
   onCreateChannel,
+  onReorderChannels,
   onCreateRole,
   onUpdateRole,
   onDeleteRole,
@@ -202,6 +204,7 @@ export function WorkspaceView({
         canManageChannels={canManageChannels}
         canManageCovil={canManageCovil && Boolean(onRemoveMember)}
         onCreateChannel={onCreateChannel ? setCreateChannelKind : undefined}
+        onReorderChannels={onReorderChannels}
         onOpenCovilSettings={() => setShowCovilSettings(true)}
         onOpenProfile={() => setSelectedProfileId(currentUser.id)}
         onToggleSounds={sounds.toggle}
