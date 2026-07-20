@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/favicon.svg" width="84" alt="Símbolo do Covil" />
   <h1>Covil</h1>
-  <p><strong>Entre. Fale. Jogue.</strong></p>
+  <p><strong>Toda call merece um Covil.</strong></p>
   <p>Um espaço privado de voz, mensagens e compartilhamento de tela para grupos pequenos.</p>
 
   [![Qualidade](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml)

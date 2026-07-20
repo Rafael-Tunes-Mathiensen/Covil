@@ -61,7 +61,7 @@ export function AuthScreen() {
         <BrandMark />
         <div className="auth-atmosphere__copy">
           <p className="eyebrow">Seu grupo. Sua frequência.</p>
-          <h1>Entre.<br />Fale. Jogue.</h1>
+          <h1>Toda call merece<br />um Covil.</h1>
           <p>Voz, mensagens e tela compartilhada em um espaço que pertence a vocês.</p>
         </div>
         <div className="signal-lines" aria-hidden="true">

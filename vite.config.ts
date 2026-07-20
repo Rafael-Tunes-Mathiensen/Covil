@@ -18,7 +18,7 @@ export default defineConfig(async ({ mode }) => {
         manifest: {
           name: 'Covil',
           short_name: 'Covil',
-          description: 'Entre. Fale. Jogue.',
+          description: 'Toda call merece um Covil.',
           theme_color: '#0b0d12',
           background_color: '#0b0d12',
           display: 'standalone',
