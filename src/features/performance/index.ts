@@ -1,0 +1,1 @@
+export { useUltraEconomyMode } from './useUltraEconomyMode'

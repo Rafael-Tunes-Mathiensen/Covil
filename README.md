@@ -25,12 +25,13 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - canais de texto e salas de voz criados pelo owner ou por cargos autorizados, até o limite de 25 canais;
 - chamadas mesh para até seis participantes, com ocupantes visíveis por sala e inspeção sem abandonar a chamada atual;
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
-- compartilhamento de tela em 720p/30 fps, áudio quando permitido pelo navegador e foco alternável sem esconder os participantes;
+- compartilhamento de tela em 720p/30 fps, áudio quando permitido pelo navegador, foco alternável sem esconder os participantes e tela cheia nativa;
 - chamada minimizável e moderação disponível tanto na sala quanto no painel lateral;
 - até 12 cargos acumuláveis e editáveis, inclusive cargos apenas visuais e autoatribuição pelo owner, com permissões opcionais para criar canais, moderar voz ou remover membros;
 - mute persistente e desconexão cooperativa da chamada, sem permitir moderar o fundador;
 - políticas RLS e RPCs autorizadas no PostgreSQL;
 - animações responsivas, diálogos acessíveis e efeitos sonoros sintetizados que podem ser desativados;
+- ultra economia persistente por dispositivo, que pausa animações, sons, detector de fala e diagnósticos contínuos, além de limitar a própria transmissão de tela a até 720p/12 fps;
 - console exclusivo do proprietário para acessos, uso do banco e diagnóstico WebRTC;
 - modo de demonstração sem conta ou backend;
 - testes, lint, build e CI no GitHub Actions.
@@ -101,6 +102,7 @@ covil/
 │   │   ├── auth/            # sessão e acesso
 │   │   ├── covil/           # grupos, canais e chat
 │   │   ├── onboarding/      # criação e convite
+│   │   ├── performance/     # preferência local de ultra economia
 │   │   ├── sound/           # efeitos sonoros sintetizados
 │   │   └── voice/           # WebRTC, fala e sinalização
 │   ├── lib/                 # configuração e utilitários
@@ -137,6 +139,7 @@ A versão 0.2.1 reúne o núcleo funcional do MVP e reforça chamadas com três 
 - [x] Motor WebRTC mesh e compartilhamento de tela
 - [x] Canais múltiplos, cargos acumuláveis e moderação cooperativa
 - [x] Indicador de fala, efeitos sonoros e animações acessíveis
+- [x] Tela compartilhada em tela cheia e modo de ultra economia
 - [x] PWA, documentação e CI
 - [ ] Teste ponta a ponta com seis contas reais
 - [ ] Credenciais TURN efêmeras para redes restritas

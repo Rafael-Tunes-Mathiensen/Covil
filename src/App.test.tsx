@@ -27,4 +27,14 @@ describe('App em modo de demonstração', () => {
       expect(screen.getByText('Mensagem criada no teste.')).toBeInTheDocument()
     })
   })
+
+  it('ativa a ultra economia e mantém a preferência', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar ultra economia de dados' }))
+
+    expect(document.documentElement).toHaveClass('ultra-economy')
+    expect(localStorage.getItem('covil:ultra-economy')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Sons pausados pela ultra economia' })).toBeDisabled()
+  })
 })

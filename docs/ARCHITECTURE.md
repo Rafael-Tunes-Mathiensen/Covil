@@ -18,6 +18,7 @@ flowchart LR
 | `src/features/admin` | Console do proprietário, acessos e métricas operacionais |
 | `src/features/auth` | Sessão e acesso por e-mail |
 | `src/features/covil` | Grupo, canais, perfis, cargos, permissões, mensagens, votações e menções |
+| `src/features/performance` | Preferência local e aplicação da ultra economia |
 | `src/features/sound` | Efeitos sonoros sintetizados e preferência local |
 | `src/features/voice` | WebRTC, detecção local de fala e transporte de sinalização |
 | `src/lib` | Configuração, Supabase e funções puras |
@@ -58,6 +59,14 @@ Cada entrada recebe um `sessionId`. Sinais de uma sessão anterior são descarta
 Os servidores ICE podem ser configurados como URLs STUN/TURN separadas por vírgula ou como um array JSON completo de `RTCIceServer`, inclusive com `username` e `credential`. O padrão atual usa somente STUN. Recuperação ICE não cria uma rota de relay: redes sem caminho P2P direto precisam de TURN com credenciais efêmeras. Segredos permanentes nunca devem entrar no bundle nem em `/config.js`.
 
 Cada canal de voz usa uma sala independente. Selecionar outra sala apenas mostra seus ocupantes e mantém a chamada atual no dock. A ação **Entrar nesta sala** encerra peers, tracks e assinaturas da chamada anterior antes de iniciar a nova. O indicador de fala analisa localmente os streams com `AnalyserNode` e RMS; apenas o estado visual transitório permanece em memória.
+
+A tela remota pode ocupar o elemento em tela cheia pela Fullscreen API, com
+fallback para o modo nativo do vídeo em navegadores compatíveis. A preferência
+local de ultra economia desliga `AnalyserNode`, efeitos sonoros e a coleta
+periódica de `getStats`, além de remover animações e filtros visuais. Ao iniciar
+um compartilhamento nesse modo, o navegador recebe restrições ideais de 854×480
+a 10 fps e máximas de 1280×720 a 12 fps. A preferência não altera a mídia
+recebida de outro participante e não é sincronizada com o servidor.
 
 ### Moderação cooperativa
 

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AudioLines,
   Headphones,
+  Fullscreen,
   LoaderCircle,
   Maximize2,
   Mic,
@@ -60,6 +61,9 @@ export function VoiceRoomPanel({
   onOpenProfile,
 }: VoiceRoomPanelProps) {
   const [isScreenFocused, setIsScreenFocused] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null)
+  const screenStageRef = useRef<HTMLDivElement>(null)
   const remoteShare = voice.remotePeers.find(({ screenStream }) => screenStream)
   const screenStream = remoteShare?.screenStream ?? voice.localScreenStream
   const sharer = remoteShare?.participant.displayName ?? currentUser.displayName
@@ -78,6 +82,37 @@ export function VoiceRoomPanel({
     () => new Map(moderationStates.map((state) => [state.userId, state])),
     [moderationStates],
   )
+
+  useEffect(() => {
+    const update = () => setIsFullscreen(document.fullscreenElement === screenStageRef.current)
+    document.addEventListener('fullscreenchange', update)
+    return () => document.removeEventListener('fullscreenchange', update)
+  }, [])
+
+  async function toggleFullscreen() {
+    const stage = screenStageRef.current
+    if (!stage) return
+    setFullscreenError(null)
+    try {
+      if (document.fullscreenElement === stage) {
+        await document.exitFullscreen()
+        return
+      }
+      if (stage.requestFullscreen) {
+        await stage.requestFullscreen()
+        return
+      }
+      const video = stage.querySelector('video') as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null
+      if (video?.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen()
+        return
+      }
+      setIsScreenFocused(true)
+      setFullscreenError('Este navegador não oferece tela cheia; a transmissão foi ampliada dentro do Covil.')
+    } catch {
+      setFullscreenError('O navegador bloqueou a tela cheia. Tente novamente pelo botão da transmissão.')
+    }
+  }
   const participantsGrid = (
     <div className="voice-grid">
       <header><Radio size={17} /><span>{voice.participants.length} na sala agora</span></header>
@@ -145,18 +180,25 @@ export function VoiceRoomPanel({
 
       {screenStream ? (
         <div className={`screen-layout${isScreenFocused ? ' is-screen-focused' : ' is-people-focused'}`}>
-          <div className="screen-stage">
+          <div className="screen-stage" ref={screenStageRef}>
             <div className="screen-stage__meta">
               <span><MonitorUp size={16} />{sharer} está compartilhando</span>
-              <button onClick={() => setIsScreenFocused((value) => !value)} type="button">
-                {isScreenFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                {isScreenFocused ? 'Ver pessoas' : 'Focar tela'}
-              </button>
+              <div className="screen-stage__actions">
+                <button onClick={() => setIsScreenFocused((value) => !value)} type="button">
+                  {isScreenFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  {isScreenFocused ? 'Ver pessoas' : 'Focar tela'}
+                </button>
+                <button aria-pressed={isFullscreen} onClick={() => void toggleFullscreen()} type="button">
+                  {isFullscreen ? <Minimize2 size={16} /> : <Fullscreen size={16} />}
+                  {isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                </button>
+              </div>
             </div>
             <StreamVideo label={`Tela compartilhada por ${sharer}`} muted={!remoteShare} stream={screenStream} />
             {!remoteShare && screenStream.getAudioTracks().length === 0 && (
               <p className="screen-stage__audio-hint">O navegador não forneceu áudio. Escolha uma aba com áudio e marque “Compartilhar áudio”.</p>
             )}
+            {fullscreenError && <p className="screen-stage__fullscreen-error" role="status">{fullscreenError}</p>}
           </div>
           <aside className="screen-layout__people">{participantsGrid}</aside>
         </div>

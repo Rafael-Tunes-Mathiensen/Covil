@@ -112,11 +112,12 @@ class NegotiationPeerConnection {
   })
 }
 
-function VoiceHarness({ transport }: { transport: SignalTransport }) {
+function VoiceHarness({ transport, enableSpeakingDetection = true }: { transport: SignalTransport; enableSpeakingDetection?: boolean }) {
   const voice = useVoiceRoom({
     roomId: 'lobby',
     participant: { id: 'local-user', displayName: 'Jogador local' },
     transport,
+    enableSpeakingDetection,
   })
 
   return (
@@ -192,6 +193,25 @@ describe('useVoiceRoom', () => {
         participant: expect.objectContaining({ sessionId: expect.any(String) }),
       }),
     )
+  })
+
+  it('não cria analisador de fala quando a ultra economia está ativa', async () => {
+    const audioContextConstructor = vi.fn(() => new FakeAudioContext())
+    vi.stubGlobal('AudioContext', audioContextConstructor)
+    const transport: SignalTransport = {
+      subscribe: vi.fn(() => () => undefined),
+      send: vi.fn(),
+      presence: vi.fn(({ participant, onChange }) => {
+        onChange([participant])
+        return () => undefined
+      }),
+    }
+
+    render(<VoiceHarness enableSpeakingDetection={false} transport={transport} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    await waitFor(() => expect(screen.getByText('joined')).toBeInTheDocument())
+    expect(audioContextConstructor).not.toHaveBeenCalled()
   })
 
   it('solicita audio do sistema ao iniciar o compartilhamento de tela', async () => {

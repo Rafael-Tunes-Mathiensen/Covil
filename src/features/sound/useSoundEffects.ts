@@ -28,7 +28,7 @@ function readVolumePreference() {
   }
 }
 
-export function useSoundEffects() {
+export function useSoundEffects(suppressed = false) {
   const [enabled, setEnabled] = useState(readEnabledPreference)
   const [volume, setVolumeState] = useState(readVolumePreference)
   const engineRef = useRef<SoundEngine | null>(null)
@@ -40,10 +40,16 @@ export function useSoundEffects() {
   const toggle = useCallback(() => setEnabled((current) => !current), [])
 
   const play = useCallback((event: SoundEvent) => {
-    if (!enabled || volume <= 0) return
+    if (suppressed || !enabled || volume <= 0) return
     engineRef.current ??= new SoundEngine()
     engineRef.current.play(event, volume)
-  }, [enabled, volume])
+  }, [enabled, suppressed, volume])
+
+  useEffect(() => {
+    if (!suppressed) return
+    engineRef.current?.dispose()
+    engineRef.current = null
+  }, [suppressed])
 
   useEffect(() => {
     try {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VoiceRoomPanel } from './VoiceRoomPanel'
 import type { UseVoiceRoomResult } from '../features/voice'
@@ -71,7 +71,7 @@ describe('VoiceRoomPanel', () => {
     expect(nameLine).toHaveTextContent('Raider')
   })
 
-  it('mantém participantes e oferece alternância de foco durante a transmissão', () => {
+  it('mantém participantes e oferece alternância de foco durante a transmissão', async () => {
     const screenStream = { getAudioTracks: () => [] } as unknown as MediaStream
     const voice = {
       error: null,
@@ -99,6 +99,13 @@ describe('VoiceRoomPanel', () => {
     expect(screen.getByText(/não forneceu áudio/i)).toBeInTheDocument()
     expect(screen.getByText('Nina')).toBeInTheDocument()
     expect(container.querySelector('.screen-layout')).toHaveClass('is-screen-focused')
+    const requestFullscreen = vi.fn(async () => undefined)
+    Object.defineProperty(container.querySelector('.screen-stage'), 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }))
+    await waitFor(() => expect(requestFullscreen).toHaveBeenCalledOnce())
     fireEvent.click(screen.getByRole('button', { name: /Ver pessoas/ }))
     expect(container.querySelector('.screen-layout')).toHaveClass('is-people-focused')
   })

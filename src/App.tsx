@@ -4,6 +4,7 @@ import { AuthScreen } from './features/auth/AuthScreen'
 import { useSession } from './features/auth/useSession'
 import { useCovilWorkspace } from './features/covil/useCovilWorkspace'
 import { useAdminConsole } from './features/admin/useAdminConsole'
+import { useUltraEconomyMode } from './features/performance'
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
 import { localSignalTransport } from './features/voice/localTransport'
 import { SupabaseVoiceTransport } from './features/voice/supabaseTransport'
@@ -14,17 +15,30 @@ import { demoChannels, demoCovil, demoMembers, demoMessages } from './data/demo'
 import { WorkspaceView } from './components/WorkspaceView'
 import type { Channel, ChatMessage } from './types/domain'
 
+const ULTRA_ECONOMY_SCREEN_CONSTRAINTS = {
+  audio: true,
+  selfBrowserSurface: 'exclude',
+  surfaceSwitching: 'include',
+  systemAudio: 'include',
+  video: {
+    frameRate: { ideal: 10, max: 12 },
+    height: { ideal: 480, max: 720 },
+    width: { ideal: 854, max: 1280 },
+  },
+} as DisplayMediaStreamOptions
+
 export default function App() {
   const { session, isLoading, isDemo } = useSession()
+  const ultraEconomy = useUltraEconomyMode()
 
   if (isLoading) return <LoadingScreen label="Abrindo o Covil" />
-  if (isDemo) return <DemoWorkspace />
+  if (isDemo) return <DemoWorkspace ultraEconomy={ultraEconomy.enabled} onToggleUltraEconomy={ultraEconomy.toggle} />
   if (!session || !supabase) return <AuthScreen />
 
-  return <ConnectedWorkspace user={session.user} />
+  return <ConnectedWorkspace user={session.user} ultraEconomy={ultraEconomy.enabled} onToggleUltraEconomy={ultraEconomy.toggle} />
 }
 
-function DemoWorkspace() {
+function DemoWorkspace({ ultraEconomy, onToggleUltraEconomy }: { ultraEconomy: boolean; onToggleUltraEconomy: () => void }) {
   const [selectedChannel, setSelectedChannel] = useState(demoChannels[0])
   const [messages, setMessages] = useState(demoMessages)
   const voiceChannel = demoChannels.find(({ kind }) => kind === 'voice') ?? demoChannels[0]
@@ -34,6 +48,9 @@ function DemoWorkspace() {
     participant: { id: currentUser.id, displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl },
     transport: localSignalTransport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
+    enableDiagnostics: !ultraEconomy,
+    enableSpeakingDetection: !ultraEconomy,
+    screenShareConstraints: ultraEconomy ? ULTRA_ECONOMY_SCREEN_CONSTRAINTS : undefined,
   })
 
   async function sendMessage(content: string) {
@@ -90,6 +107,8 @@ function DemoWorkspace() {
       onDeleteMessage={deleteMessage}
       onCreatePoll={createPoll}
       onVotePoll={votePoll}
+      ultraEconomy={ultraEconomy}
+      onToggleUltraEconomy={onToggleUltraEconomy}
       onEditMessage={editMessage}
       onSelectChannel={setSelectedChannel}
       onSendMessage={sendMessage}
@@ -100,7 +119,7 @@ function DemoWorkspace() {
   )
 }
 
-function ConnectedWorkspace({ user }: { user: User }) {
+function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user: User; ultraEconomy: boolean; onToggleUltraEconomy: () => void }) {
   const workspace = useCovilWorkspace(supabase!, user)
 
   if (workspace.isLoading) return <LoadingScreen label="Sincronizando seu grupo" />
@@ -157,6 +176,8 @@ function ConnectedWorkspace({ user }: { user: User }) {
       selectedChannel={workspace.selectedChannel}
       user={user}
       voiceChannel={voiceChannel}
+      ultraEconomy={ultraEconomy}
+      onToggleUltraEconomy={onToggleUltraEconomy}
     />
   )
 }
@@ -196,6 +217,8 @@ interface ConnectedWorkspaceReadyProps {
   onUploadAvatar: ReturnType<typeof useCovilWorkspace>['uploadAvatar']
   onRemoveAvatar: ReturnType<typeof useCovilWorkspace>['removeAvatar']
   onUpdatePassword: ReturnType<typeof useCovilWorkspace>['updatePassword']
+  ultraEconomy: boolean
+  onToggleUltraEconomy: () => void
 }
 
 function ConnectedWorkspaceReady({
@@ -233,6 +256,8 @@ function ConnectedWorkspaceReady({
   onUploadAvatar,
   onRemoveAvatar,
   onUpdatePassword,
+  ultraEconomy,
+  onToggleUltraEconomy,
 }: ConnectedWorkspaceReadyProps) {
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState(voiceChannel.id)
   const requestedVoiceChannelIdRef = useRef<string | null>(null)
@@ -250,6 +275,9 @@ function ConnectedWorkspaceReady({
     participant: { id: currentUser.id, displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl },
     transport,
     rtcConfiguration: { iceServers: appConfig.iceServers },
+    enableDiagnostics: !ultraEconomy,
+    enableSpeakingDetection: !ultraEconomy,
+    screenShareConstraints: ultraEconomy ? ULTRA_ECONOMY_SCREEN_CONSTRAINTS : undefined,
   })
   const admin = useAdminConsole(supabase!)
   const setServerMuted = voice.setServerMuted
@@ -340,6 +368,8 @@ function ConnectedWorkspaceReady({
       onUploadAvatar={onUploadAvatar}
       onRemoveAvatar={onRemoveAvatar}
       onUpdatePassword={onUpdatePassword}
+      ultraEconomy={ultraEconomy}
+      onToggleUltraEconomy={onToggleUltraEconomy}
       onSignOut={() => void supabase!.auth.signOut()}
       selectedChannel={selectedChannel}
       voice={voice}

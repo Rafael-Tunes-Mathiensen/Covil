@@ -135,6 +135,10 @@ export interface UseVoiceRoomOptions {
   rtcConfiguration?: RTCConfiguration
   microphoneConstraints?: MediaTrackConstraints | boolean
   screenShareConstraints?: DisplayMediaStreamOptions
+  /** Desativa analisadores de fala para reduzir CPU e memória. */
+  enableSpeakingDetection?: boolean
+  /** Desativa a coleta periódica de estatísticas WebRTC. */
+  enableDiagnostics?: boolean
   /** Defaults to true. Disable when the UI renders and plays its own audio tags. */
   autoPlayRemoteAudio?: boolean
   onError?: (error: VoiceRoomError) => void

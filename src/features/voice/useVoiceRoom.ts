@@ -1097,6 +1097,8 @@ export function useVoiceRoom({
   rtcConfiguration,
   microphoneConstraints = DEFAULT_MICROPHONE_CONSTRAINTS,
   screenShareConstraints = DEFAULT_SCREEN_SHARE_CONSTRAINTS,
+  enableSpeakingDetection = true,
+  enableDiagnostics = true,
   autoPlayRemoteAudio = true,
   onError,
 }: UseVoiceRoomOptions): UseVoiceRoomResult {
@@ -1279,7 +1281,7 @@ export function useVoiceRoom({
     for (const track of microphoneStream.getAudioTracks()) {
       track.enabled = !(selfMutedRef.current || serverMutedRef.current)
     }
-    startSpeakingActivity(session)
+    if (enableSpeakingDetection) startSpeakingActivity(session)
     setLocalStream(microphoneStream)
     setParticipants([localParticipant])
 
@@ -1328,6 +1330,7 @@ export function useVoiceRoom({
     }
   }, [
     autoPlayRemoteAudio,
+    enableSpeakingDetection,
     microphoneConstraints,
     participant,
     reportError,
@@ -1336,6 +1339,16 @@ export function useVoiceRoom({
     rtcConfiguration,
     transport,
   ])
+
+  useEffect(() => {
+    const session = sessionRef.current
+    if (!session || session.disposed) return
+    if (enableSpeakingDetection) {
+      startSpeakingActivity(session)
+    } else {
+      void stopSpeakingActivity(session)
+    }
+  }, [enableSpeakingDetection])
 
   const leave = useCallback(async () => {
     const generation = ++generationRef.current
@@ -1486,7 +1499,7 @@ export function useVoiceRoom({
   const clearError = useCallback(() => setError(null), [])
 
   useEffect(() => {
-    if (status !== 'joined') return
+    if (status !== 'joined' || !enableDiagnostics) return
 
     let cancelled = false
     const collect = async () => {
@@ -1525,7 +1538,7 @@ export function useVoiceRoom({
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [status])
+  }, [enableDiagnostics, status])
 
   useEffect(() => {
     mountedRef.current = true

@@ -129,6 +129,20 @@ describe('useSoundEffects', () => {
     expect(FakeAudioContext.instances).toHaveLength(0)
   })
 
+  it('descarta e não recria o motor quando a ultra economia suprime os sons', () => {
+    const { result, rerender } = renderHook(
+      ({ suppressed }) => useSoundEffects(suppressed),
+      { initialProps: { suppressed: true } },
+    )
+
+    act(() => result.current.play('message'))
+    expect(FakeAudioContext.instances).toHaveLength(0)
+
+    rerender({ suppressed: false })
+    act(() => result.current.play('message'))
+    expect(FakeAudioContext.instances).toHaveLength(1)
+  })
+
   it('mantém o ganho mestre baixo mesmo no volume máximo', () => {
     const { result } = renderHook(() => useSoundEffects())
 

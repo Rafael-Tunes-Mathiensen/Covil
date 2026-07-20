@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Volume2,
   VolumeX,
+  ZapOff,
 } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 import type { VoicePresenceByChannel } from '../features/voice'
@@ -38,6 +39,9 @@ interface SidebarProps {
   soundsEnabled?: boolean
   onToggleSounds?: () => void
   onOpenProfile?: () => void
+  soundsSuppressed?: boolean
+  ultraEconomy?: boolean
+  onToggleUltraEconomy?: () => void
 }
 
 export function Sidebar({
@@ -61,6 +65,9 @@ export function Sidebar({
   soundsEnabled = true,
   onToggleSounds,
   onOpenProfile,
+  soundsSuppressed = false,
+  ultraEconomy = false,
+  onToggleUltraEconomy,
 }: SidebarProps) {
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [isCopyingInvite, setIsCopyingInvite] = useState(false)
@@ -216,14 +223,27 @@ export function Sidebar({
         </button>
         {onToggleSounds && (
           <button
-            aria-label={soundsEnabled ? 'Desativar sons da interface' : 'Ativar sons da interface'}
-            aria-pressed={soundsEnabled}
+            aria-label={soundsSuppressed ? 'Sons pausados pela ultra economia' : soundsEnabled ? 'Desativar sons da interface' : 'Ativar sons da interface'}
+            aria-pressed={soundsEnabled && !soundsSuppressed}
             className="sound-toggle"
+            disabled={soundsSuppressed}
             onClick={onToggleSounds}
-            title={soundsEnabled ? 'Sons ligados' : 'Sons desligados'}
+            title={soundsSuppressed ? 'Sons pausados pela ultra economia' : soundsEnabled ? 'Sons ligados' : 'Sons desligados'}
             type="button"
           >
             {soundsEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+          </button>
+        )}
+        {onToggleUltraEconomy && (
+          <button
+            aria-label={ultraEconomy ? 'Desativar ultra economia de dados' : 'Ativar ultra economia de dados'}
+            aria-pressed={ultraEconomy}
+            className={`economy-toggle${ultraEconomy ? ' is-active' : ''}`}
+            onClick={onToggleUltraEconomy}
+            title={ultraEconomy ? 'Ultra economia ligada' : 'Poupar dados e desempenho'}
+            type="button"
+          >
+            <ZapOff size={17} />
           </button>
         )}
         {canManageCovil && onOpenCovilSettings && (

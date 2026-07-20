@@ -17,7 +17,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
 - Selecionar uma sala de voz permite inspecionar seus ocupantes sem interromper a chamada mantida no dock; entrar nela é uma ação explícita.
 - O contorno do avatar e uma pequena forma de onda entre a foto e o nome respondem somente enquanto o detector local identifica fala.
-- O compartilhamento de tela expande a área principal, mas mantém participantes e moderação em uma coluna; a pessoa alterna entre foco na tela e foco no grupo.
+- O compartilhamento de tela expande a área principal, mas mantém participantes e moderação em uma coluna; a pessoa alterna entre foco na tela, foco no grupo e tela cheia nativa.
 - Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.
 - Ações de editar ou excluir aparecem no hover e no foco da própria mensagem; menções são sugeridas acima do compositor, destacadas no fluxo e notificadas por um aviso curto.
 - Digitar `/` abre comandos com descrição; votação, roleta e dado usam diálogos focados e animações breves.
@@ -35,6 +35,12 @@ Os efeitos de entrada, saída, mute, mensagem e compartilhamento são tons curto
 sintetizados com Web Audio, sem arquivos de áudio externos. A preferência de
 liga/desliga fica somente no `localStorage` do navegador e pode ser alterada na
 barra do usuário.
+
+A ultra economia também fica somente no `localStorage`. Quando ativa, ela remove
+movimento e efeitos decorativos, pausa os sons, o detector visual de fala e a
+coleta periódica de diagnósticos. Os controles essenciais, chat e chamada
+continuam disponíveis, e a própria transmissão de tela usa uma taxa de quadros
+menor para reduzir processamento e tráfego.
 
 Diálogos usam `role="dialog"`, título associado, foco inicial, contenção de Tab,
 fechamento por Escape e restauração do foco. Botões apenas com ícone têm nomes

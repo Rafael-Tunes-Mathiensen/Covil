@@ -69,6 +69,8 @@ interface WorkspaceViewProps {
   onUploadAvatar?: (file: File) => Promise<unknown>
   onRemoveAvatar?: () => Promise<unknown>
   onUpdatePassword?: (password: string) => Promise<unknown>
+  ultraEconomy?: boolean
+  onToggleUltraEconomy?: () => void
 }
 
 export function WorkspaceView({
@@ -111,6 +113,8 @@ export function WorkspaceView({
   onUploadAvatar,
   onRemoveAvatar,
   onUpdatePassword,
+  ultraEconomy = false,
+  onToggleUltraEconomy,
 }: WorkspaceViewProps) {
   const [showMembers, setShowMembers] = useState(
     () => typeof window === 'undefined' || window.innerWidth > 1050,
@@ -119,7 +123,7 @@ export function WorkspaceView({
   const [showCovilSettings, setShowCovilSettings] = useState(false)
   const [createChannelKind, setCreateChannelKind] = useState<ChannelKind | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
-  const sounds = useSoundEffects()
+  const sounds = useSoundEffects(ultraEconomy)
   const previousMessageRef = useRef<{ channelId: string; messageIds: Set<string> } | null>(null)
   const previousVoiceIdsRef = useRef<Set<string> | null>(null)
   const canManageChannels = hasCovilPermission(currentPermissions, 'manage_channels')
@@ -183,7 +187,7 @@ export function WorkspaceView({
   }, [currentUser.id, sounds, voice.participants, voice.status])
 
   return (
-    <main className={`app-shell${showMembers ? '' : ' app-shell--members-hidden'}`}>
+    <main className={`app-shell${showMembers ? '' : ' app-shell--members-hidden'}${ultraEconomy ? ' app-shell--ultra-economy' : ''}`}>
       <Sidebar
         channels={channels}
         covil={covil}
@@ -202,6 +206,9 @@ export function WorkspaceView({
         onOpenProfile={() => setSelectedProfileId(currentUser.id)}
         onToggleSounds={sounds.toggle}
         soundsEnabled={sounds.enabled}
+        soundsSuppressed={ultraEconomy}
+        ultraEconomy={ultraEconomy}
+        onToggleUltraEconomy={onToggleUltraEconomy}
         voiceChannelId={voice.status === 'joined' ? voiceChannel.id : null}
         voicePresenceByChannel={voicePresenceByChannel}
         voiceStatus={voice.status}
