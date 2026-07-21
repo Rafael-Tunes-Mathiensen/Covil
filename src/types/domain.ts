@@ -15,6 +15,14 @@ export interface Covil {
   id: string
   name: string
   inviteCode: string
+  memberLimit: number
+}
+
+export interface CovilSummary {
+  id: string
+  name: string
+  memberLimit: number
+  role: MemberRole
 }
 
 export interface Channel {

@@ -516,6 +516,135 @@ textarea:focus-visible {
   text-align: left;
 }
 
+.covil-switcher-wrap {
+  position: relative;
+  flex: 0 0 70px;
+}
+
+.covil-switcher svg { transition: color 160ms ease, transform 160ms ease; }
+.covil-switcher svg.is-open { transform: rotate(180deg); }
+
+.covil-menu {
+  position: absolute;
+  z-index: 20;
+  top: 62px;
+  right: 9px;
+  left: 9px;
+  overflow: hidden;
+  border: 1px solid #303846;
+  border-radius: 13px;
+  background: #111720;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 45%);
+}
+
+.covil-menu__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px 8px;
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: .16em;
+}
+
+.covil-menu__header small {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 5%);
+}
+
+.covil-menu__list {
+  display: grid;
+  gap: 3px;
+  max-height: min(300px, 42vh);
+  padding: 4px 7px 8px;
+  overflow: auto;
+}
+
+.covil-menu__list > button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+  gap: 9px;
+  align-items: center;
+  min-height: 48px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+}
+
+.covil-menu__list > button:hover,
+.covil-menu__list > button.is-active { color: var(--text); background: rgb(255 255 255 / 5%); }
+.covil-menu__list > button.is-active > svg { color: var(--success); }
+.covil-menu__list > button > span:nth-child(2) { min-width: 0; }
+.covil-menu__list strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.covil-menu__list small { display: flex; align-items: center; gap: 4px; margin-top: 3px; color: var(--faint); font-size: 8px; }
+
+.covil-menu__avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgb(255 112 67 / 28%);
+  border-radius: 10px;
+  color: #ff9b7c;
+  background: rgb(255 112 67 / 10%);
+  font: 700 10px "Space Grotesk", sans-serif;
+}
+
+.covil-menu__actions {
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+  border-top: 1px solid var(--line);
+}
+
+.covil-menu__actions button,
+.covil-menu__form header button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 9px;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 10px;
+}
+
+.covil-menu__actions button:hover { color: var(--text); background: rgb(255 255 255 / 5%); }
+.covil-menu__actions button.is-owner-action { color: #ff9b7c; }
+.covil-menu__error { margin: 0; padding: 0 14px 8px; color: #ff9ca3; font-size: 9px; }
+
+.covil-menu__form { display: grid; gap: 12px; padding: 13px; }
+.covil-menu__form header { display: flex; align-items: center; justify-content: space-between; }
+.covil-menu__form header button { min-height: 28px; padding: 0; color: var(--faint); }
+.covil-menu__form header strong { color: var(--text); font-size: 11px; }
+.covil-menu__form label { display: grid; gap: 6px; color: var(--faint); font-size: 9px; }
+.covil-menu__form input,
+.covil-menu__form select,
+.covil-limit-form select,
+.onboarding-form select {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #303846;
+  border-radius: 9px;
+  outline: none;
+  color: var(--text);
+  background: #0b0f15;
+}
+.covil-menu__form input:focus,
+.covil-menu__form select:focus,
+.covil-limit-form select:focus,
+.onboarding-form select:focus { border-color: rgb(255 112 67 / 65%); box-shadow: 0 0 0 3px rgb(255 112 67 / 10%); }
+.covil-menu__submit { display: flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border-radius: 9px; color: #fff; background: var(--accent); font-weight: 700; }
+
 .covil-switcher:disabled {
   cursor: default;
   opacity: 1;
@@ -2262,6 +2391,16 @@ button.voice-error {
   margin-top: 8px;
 }
 
+.covil-limit-form {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.covil-limit-form__heading { display: grid; gap: 4px; }
+.covil-limit-form__heading strong { font-size: 12px; }
+.covil-limit-form__heading small { color: var(--faint); font-size: 9px; }
+
 .settings-tabs {
   display: flex;
   gap: 4px;
@@ -2985,6 +3124,9 @@ button.voice-error {
     min-height: 58px;
     padding: 0;
   }
+
+  .covil-switcher-wrap { flex-basis: 58px; }
+  .covil-menu { top: 0; right: auto; left: 68px; width: 250px; }
 
   .covil-switcher::after {
     display: grid;

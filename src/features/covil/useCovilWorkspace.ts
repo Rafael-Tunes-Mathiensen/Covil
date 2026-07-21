@@ -6,6 +6,7 @@ import type {
   ChannelKind,
   ChatMessage,
   Covil,
+  CovilSummary,
   CovilPermission,
   CovilRole,
   MemberRole,
@@ -27,6 +28,7 @@ interface MembershipRow {
 interface CovilRow {
   id: string
   name: string
+  member_limit: number
 }
 
 interface ChannelRow {
@@ -128,6 +130,7 @@ function getErrorMessage(error: unknown) {
 
 export function useCovilWorkspace(client: SupabaseClient, user: User) {
   const [covil, setCovil] = useState<Covil | null>(null)
+  const [availableCovils, setAvailableCovils] = useState<CovilSummary[]>([])
   const [channels, setChannels] = useState<Channel[]>([])
   const [members, setMembers] = useState<Profile[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -139,6 +142,9 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const activeCovilIdRef = useRef<string | null>(
+    typeof window === 'undefined' ? null : window.localStorage.getItem('covil:active-covil'),
+  )
 
   const selectedChannel = useMemo(
     () => channels.find(({ id }) => id === selectedChannelId) ?? channels[0] ?? null,
@@ -155,7 +161,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     messageRequestRef.current += 1
   }, [selectedChannel?.id])
 
-  const loadWorkspace = useCallback(async (showLoading = true) => {
+  const loadWorkspace = useCallback(async (showLoading = true, requestedCovilId?: string) => {
     if (showLoading) setIsLoading(true)
     setError(null)
 
@@ -165,24 +171,51 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         .select('covil_id, role')
         .eq('user_id', user.id)
         .order('joined_at', { ascending: true })
-        .limit(1)
 
       if (membershipResult.error) throw membershipResult.error
-      const membership = (membershipResult.data?.[0] ?? null) as MembershipRow | null
+      const memberships = (membershipResult.data ?? []) as MembershipRow[]
 
-      if (!membership) {
+      if (memberships.length === 0) {
         setCovil(null)
+        setAvailableCovils([])
         setChannels([])
         setMembers([])
         setMessages([])
         setRoles([])
         setMemberRoleAssignments([])
         setVoiceModerationStates([])
+        activeCovilIdRef.current = null
+        if (typeof window !== 'undefined') window.localStorage.removeItem('covil:active-covil')
         return
       }
 
-      const [covilResult, channelResult, memberResult, roleResult, assignmentResult] = await Promise.all([
-        client.from('covils').select('id, name').eq('id', membership.covil_id).single(),
+      const covilsResult = await client
+        .from('covils')
+        .select('id, name, member_limit')
+        .in('id', memberships.map(({ covil_id }) => covil_id))
+
+      if (covilsResult.error) throw covilsResult.error
+      const covilRows = (covilsResult.data ?? []) as CovilRow[]
+      const membershipByCovil = new Map(memberships.map((membership) => [membership.covil_id, membership]))
+      const covilById = new Map(covilRows.map((row) => [row.id, row]))
+      const nextAvailableCovils = memberships.flatMap((membership) => {
+        const row = covilById.get(membership.covil_id)
+        return row
+          ? [{ id: row.id, name: row.name, memberLimit: row.member_limit, role: membership.role }]
+          : []
+      })
+      const selectedCovilId = [requestedCovilId, activeCovilIdRef.current]
+        .find((id) => id && membershipByCovil.has(id)) ?? nextAvailableCovils[0]?.id
+      const membership = selectedCovilId ? membershipByCovil.get(selectedCovilId) : undefined
+      const covilRow = selectedCovilId ? covilById.get(selectedCovilId) : undefined
+
+      if (!membership || !covilRow) throw new Error('Não foi possível selecionar um Covil disponível.')
+
+      setAvailableCovils(nextAvailableCovils)
+      activeCovilIdRef.current = covilRow.id
+      if (typeof window !== 'undefined') window.localStorage.setItem('covil:active-covil', covilRow.id)
+
+      const [channelResult, memberResult, roleResult, assignmentResult] = await Promise.all([
         client
           .from('channels')
           .select('id, covil_id, name, kind, position')
@@ -200,13 +233,11 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           .eq('covil_id', membership.covil_id),
       ])
 
-      if (covilResult.error) throw covilResult.error
       if (channelResult.error) throw channelResult.error
       if (memberResult.error) throw memberResult.error
       if (roleResult.error) throw roleResult.error
       if (assignmentResult.error) throw assignmentResult.error
 
-      const covilRow = covilResult.data as CovilRow
       let inviteCode = ''
       if (membership.role === 'owner') {
         const inviteResult = await client.rpc('get_covil_invite', {
@@ -269,7 +300,12 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         }))
       }
 
-      setCovil({ id: covilRow.id, name: covilRow.name, inviteCode })
+      setCovil({
+        id: covilRow.id,
+        name: covilRow.name,
+        inviteCode,
+        memberLimit: covilRow.member_limit,
+      })
       setMembers(nextMembers)
       setChannels(nextChannels)
       setRoles(nextRoles)
@@ -391,7 +427,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covil_members',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -400,7 +436,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           schema: 'public',
           table: 'profiles',
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -410,7 +446,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'channels',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -420,7 +456,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covils',
           filter: `id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -430,7 +466,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covil_roles',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -440,7 +476,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           table: 'covil_member_roles',
           filter: `covil_id=eq.${covil.id}`,
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -449,7 +485,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
           schema: 'public',
           table: 'voice_moderation_states',
         },
-        () => void loadWorkspace(false),
+        () => void loadWorkspace(false, covil.id),
       )
       .on(
         'postgres_changes',
@@ -522,22 +558,48 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     }
   }, [client, loadMessages, selectedChannel])
 
-  async function createCovil(name: string) {
+  async function createCovil(name: string, memberLimit = 6) {
     setIsSubmitting(true)
     setError(null)
-    const result = await client.rpc('create_covil', { p_name: name })
-    if (result.error) setError(result.error.message)
-    else await loadWorkspace(false)
-    setIsSubmitting(false)
+    try {
+      const result = await client.rpc('create_covil_with_limit', {
+        p_name: name,
+        p_member_limit: memberLimit,
+      })
+      if (result.error) throw result.error
+      await loadWorkspace(false, String(result.data))
+    } catch (cause) {
+      const message = getErrorMessage(cause)
+      setError(message)
+      throw new Error(message, { cause })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   async function joinCovil(inviteCode: string) {
     setIsSubmitting(true)
     setError(null)
-    const result = await client.rpc('join_covil_by_invite', { p_invite_code: inviteCode })
-    if (result.error) setError(result.error.message)
-    else await loadWorkspace(false)
-    setIsSubmitting(false)
+    try {
+      const result = await client.rpc('join_covil_by_invite', { p_invite_code: inviteCode })
+      if (result.error) throw result.error
+      await loadWorkspace(false, String(result.data))
+    } catch (cause) {
+      const message = getErrorMessage(cause)
+      setError(message)
+      throw new Error(message, { cause })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function switchCovil(covilId: string) {
+    if (!availableCovils.some(({ id }) => id === covilId)) {
+      throw new Error('Você não participa desse Covil.')
+    }
+    setMessages([])
+    setSelectedChannelId(null)
+    await loadWorkspace(true, covilId)
   }
 
   async function sendMessage(content: string) {
@@ -653,6 +715,17 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     return mutateWorkspace('update_covil_settings', {
       p_covil_id: covil.id,
       p_name: nextName,
+    })
+  }
+
+  async function updateCovilMemberLimit(memberLimit: number) {
+    if (!covil) throw new Error('Nenhum Covil está selecionado.')
+    if (!Number.isInteger(memberLimit) || memberLimit < members.length || memberLimit > 6) {
+      throw new Error(`O limite deve estar entre ${members.length} e 6 membros.`)
+    }
+    return mutateWorkspace('update_covil_member_limit', {
+      p_covil_id: covil.id,
+      p_member_limit: memberLimit,
     })
   }
 
@@ -854,6 +927,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
 
   return {
     covil,
+    availableCovils,
     channels,
     members,
     messages,
@@ -870,6 +944,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     setSelectedChannelId,
     createCovil,
     joinCovil,
+    switchCovil,
     sendMessage,
     createPoll,
     votePoll,
@@ -878,6 +953,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     refreshInvite,
     rotateInvite,
     updateCovilName,
+    updateCovilMemberLimit,
     createChannel,
     reorderChannels,
     createRole,

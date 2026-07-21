@@ -76,7 +76,7 @@ Como a chamada é P2P e não existe SFU controlando a mídia, essa moderação d
 
 ## Dados e autorização
 
-O banco usa `auth.uid()` como identidade. RLS limita cada leitura ao Covil do usuário, e RPCs `SECURITY DEFINER` concentram as escritas que exigem autorização, validação ou trava transacional. `create_covil` e `join_covil_by_invite` cuidam do ciclo de entrada; o código de convite tem 128 bits, só pode ser consultado pelo owner e é substituído atomicamente quando alguém entra.
+O banco usa `auth.uid()` como identidade. RLS limita cada leitura aos Covils dos quais o usuário participa, e RPCs `SECURITY DEFINER` concentram as escritas que exigem autorização, validação ou trava transacional. `create_covil` e `create_covil_with_limit` aceitam somente a conta presente em `private.app_admins`; `join_covil_by_invite` permite que uma pessoa acumule memberships em Covils diferentes. O código de convite tem 128 bits, só pode ser consultado pelo owner e é substituído atomicamente quando alguém entra.
 
 O owner possui implicitamente `manage_channels`, `moderate_voice`, `remove_members` e `manage_covil`. Membros podem acumular cargos; sua permissão efetiva é a união das permissões de todos eles. Um cargo pode ter o array de permissões vazio e funcionar apenas como identidade visual. Somente o owner cria, edita, exclui ou atribui cargos, até o limite de 12; ele também pode atribuí-los à própria conta sem alterar sua autoridade implícita. `update_covil_settings()` permite ao owner ou a um cargo com `manage_covil` alterar o nome, sem transferir ownership ou abrir a administração de cargos. A criação de canais passa por `create_covil_channel()`, aceita owner ou cargo com `manage_channels` e serializa a contagem para não ultrapassar 25 canais. `reorder_covil_channels()` recebe todos os IDs de uma seção, rejeita ausências, duplicações ou canais de outro Covil e atualiza as posições atomicamente sob a mesma permissão. Remoção de membro e moderação de voz também passam por RPCs, com proteção para o fundador.
 
@@ -84,13 +84,13 @@ Perfis ficam em `profiles`; imagens de até 2 MB são armazenadas no bucket púb
 
 Mensagens são texto simples persistido no PostgreSQL. Qualquer membro do canal pode lê-las e mencionar perfis do mesmo Covil, mas as policies RLS e os grants de coluna permitem editar ou excluir somente registros cujo `author_id` seja o usuário autenticado. Eventos `INSERT`, `UPDATE` e `DELETE` recarregam o canal aberto pelo Realtime.
 
-O limite de seis membros é garantido por trigger com trava na linha do Covil, não apenas pela interface. A allowlist `private.app_admins` concede ao proprietário funções administrativas autenticadas para consultar contas, memberships e métricas agregadas, além de remover membros comuns. Essas funções não concedem leitura global do conteúdo de `messages`.
+Cada Covil guarda um `member_limit` entre 1 e 6. O limite é garantido por trigger com trava na linha do Covil, não apenas pela interface, e não pode ser reduzido abaixo da ocupação atual. A allowlist `private.app_admins` concede ao proprietário a criação de Covils, o ajuste desses limites e funções administrativas autenticadas para consultar contas, memberships e métricas agregadas, além de remover membros comuns. Essas funções não concedem leitura global do conteúdo de `messages`.
 
 Consulte [SUPABASE.md](./SUPABASE.md) para a matriz de autorização e os passos de configuração.
 
 ## Limites deliberados do MVP
 
-- um Covil ativo por usuário na interface;
+- um Covil ativo por vez na interface, escolhido entre todas as memberships do usuário e lembrado localmente;
 - até 25 canais de texto e voz e 12 cargos por Covil;
 - malha WebRTC para até seis participantes;
 - ausência de SFU e configuração padrão somente com STUN, sem TURN gerenciado nesta etapa;

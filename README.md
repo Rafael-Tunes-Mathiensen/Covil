@@ -11,7 +11,7 @@
 
 ---
 
-O Covil é uma PWA desktop-first criada para grupos de até seis pessoas. O frontend roda no navegador, Supabase cuida de autenticação e chat, e WebRTC conecta os participantes diretamente para voz e tela compartilhada.
+O Covil é uma PWA desktop-first criada para grupos privados de até seis pessoas. O proprietário da aplicação pode manter vários Covils, cada um com capacidade própria; o frontend roda no navegador, Supabase cuida de autenticação e chat, e WebRTC conecta os participantes diretamente para voz e tela compartilhada.
 
 O projeto abre em **modo de demonstração** quando não encontra credenciais do Supabase. Isso permite explorar a interface, enviar mensagens locais e testar o próprio microfone ou tela antes de configurar qualquer serviço externo.
 
@@ -19,7 +19,8 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 
 - identidade visual responsiva e instalável como PWA;
 - cadastro e login por e-mail com Supabase Auth;
-- criação de grupo privado e entrada por convite de uso único;
+- criação de múltiplos Covils exclusiva da conta proprietária, capacidade de 1 a 6 membros e entrada por convite de uso único;
+- seletor lateral para alternar entre todos os Covils dos quais a pessoa participa;
 - mensagens em tempo real com menções notificadas, edição, exclusão, votações, roleta e dado;
 - perfis com nome, foto, descrição e troca de senha, visíveis apenas entre membros do mesmo Covil;
 - canais de texto e salas de voz criados e reordenados por arrastar pelo owner ou por cargos autorizados, até o limite de 25 canais;

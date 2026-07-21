@@ -1,6 +1,5 @@
 import { useState, type DragEvent } from 'react'
 import {
-  ChevronDown,
   Copy,
   Hash,
   Headphones,
@@ -16,11 +15,13 @@ import {
 } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 import type { VoicePresenceByChannel } from '../features/voice'
-import type { Channel, ChannelKind, Covil, Profile } from '../types/domain'
+import type { Channel, ChannelKind, Covil, CovilSummary, Profile } from '../types/domain'
 import { Avatar } from './Avatar'
+import { CovilSwitcherMenu } from './CovilSwitcherMenu'
 
 interface SidebarProps {
   covil: Covil
+  availableCovils?: readonly CovilSummary[]
   channels: Channel[]
   currentChannelId: string
   currentUser: Profile
@@ -38,6 +39,10 @@ interface SidebarProps {
   onCreateChannel?: (kind: ChannelKind) => void
   onReorderChannels?: (kind: ChannelKind, channelIds: string[]) => void | Promise<unknown>
   onOpenCovilSettings?: () => void
+  onCreateCovil?: (name: string, memberLimit: number) => Promise<void>
+  onJoinCovil?: (inviteCode: string) => Promise<void>
+  onSwitchCovil?: (covilId: string) => Promise<void>
+  isSubmitting?: boolean
   soundsEnabled?: boolean
   onToggleSounds?: () => void
   onOpenProfile?: () => void
@@ -48,6 +53,7 @@ interface SidebarProps {
 
 export function Sidebar({
   covil,
+  availableCovils = [],
   channels,
   currentChannelId,
   currentUser,
@@ -65,6 +71,10 @@ export function Sidebar({
   onCreateChannel,
   onReorderChannels,
   onOpenCovilSettings,
+  onCreateCovil,
+  onJoinCovil,
+  onSwitchCovil,
+  isSubmitting = false,
   soundsEnabled = true,
   onToggleSounds,
   onOpenProfile,
@@ -158,16 +168,17 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar__brand"><BrandMark /></div>
-      <button
-        aria-label={canOpenCovilSettings ? `Configurações de ${covil.name}` : undefined}
-        className={`covil-switcher${canOpenCovilSettings ? ' is-actionable' : ''}`}
-        disabled={!canOpenCovilSettings}
-        onClick={canOpenCovilSettings ? onOpenCovilSettings : undefined}
-        title={canOpenCovilSettings ? 'Abrir configurações do Covil' : covil.name}
-        type="button"
-      >
-        <span>{covil.name}</span><ChevronDown size={17} />
-      </button>
+      <CovilSwitcherMenu
+        activeCovil={covil}
+        availableCovils={availableCovils.length > 0 ? availableCovils : [{ ...covil, role: currentUser.role ?? 'member' }]}
+        canCreateCovil={Boolean(isAppAdmin)}
+        canManageCovil={canOpenCovilSettings}
+        isSubmitting={isSubmitting}
+        onCreateCovil={onCreateCovil}
+        onJoinCovil={onJoinCovil}
+        onOpenSettings={onOpenCovilSettings}
+        onSwitchCovil={onSwitchCovil ?? (async () => undefined)}
+      />
 
       <nav className="channel-list" aria-label="Canais do Covil">
         <ChannelSection

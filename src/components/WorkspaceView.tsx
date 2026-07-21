@@ -12,6 +12,7 @@ import type {
   ChannelKind,
   ChatMessage,
   Covil,
+  CovilSummary,
   CovilPermission,
   CovilRole,
   MemberRoleAssignment,
@@ -31,6 +32,7 @@ import { VoiceRoomPanel } from './VoiceRoomPanel'
 
 interface WorkspaceViewProps {
   covil: Covil
+  availableCovils?: readonly CovilSummary[]
   channels: Channel[]
   selectedChannel: Channel
   messages: ChatMessage[]
@@ -50,6 +52,10 @@ interface WorkspaceViewProps {
   onRefreshInvite?: () => Promise<string>
   onRotateInvite?: () => Promise<string>
   onUpdateCovilName?: (name: string) => Promise<unknown>
+  onUpdateCovilMemberLimit?: (memberLimit: number) => Promise<unknown>
+  onCreateCovil?: (name: string, memberLimit: number) => Promise<void>
+  onJoinCovil?: (inviteCode: string) => Promise<void>
+  onSwitchCovil?: (covilId: string) => Promise<void>
   admin?: AdminConsoleState
   currentPermissions?: readonly CovilPermission[]
   roles?: readonly CovilRole[]
@@ -77,6 +83,7 @@ interface WorkspaceViewProps {
 
 export function WorkspaceView({
   covil,
+  availableCovils = [],
   channels,
   selectedChannel,
   messages,
@@ -96,6 +103,10 @@ export function WorkspaceView({
   onRefreshInvite,
   onRotateInvite,
   onUpdateCovilName,
+  onUpdateCovilMemberLimit,
+  onCreateCovil,
+  onJoinCovil,
+  onSwitchCovil,
   admin,
   currentPermissions = [],
   roles = [],
@@ -194,6 +205,7 @@ export function WorkspaceView({
   return (
     <main className={`app-shell${showMembers ? '' : ' app-shell--members-hidden'}${ultraEconomy ? ' app-shell--ultra-economy' : ''}`}>
       <Sidebar
+        availableCovils={availableCovils}
         channels={channels}
         covil={covil}
         currentChannelId={selectedChannel.id}
@@ -209,6 +221,10 @@ export function WorkspaceView({
         onCreateChannel={onCreateChannel ? setCreateChannelKind : undefined}
         onReorderChannels={onReorderChannels}
         onOpenCovilSettings={() => setShowCovilSettings(true)}
+        onCreateCovil={onCreateCovil}
+        onJoinCovil={onJoinCovil}
+        onSwitchCovil={onSwitchCovil}
+        isSubmitting={isSubmitting}
         onOpenProfile={() => setSelectedProfileId(currentUser.id)}
         onToggleSounds={sounds.toggle}
         soundsEnabled={sounds.enabled}
@@ -283,7 +299,7 @@ export function WorkspaceView({
           assignments={memberRoleAssignments}
           canModerate={canModerateVoice}
           currentUserId={currentUser.id}
-          memberLimit={6}
+          memberLimit={covil.memberLimit}
           members={members}
           moderationStates={voiceModerationStates.filter(({ channelId }) => channelId === voiceChannel.id)}
           roles={roles}
@@ -308,6 +324,7 @@ export function WorkspaceView({
         <CovilSettingsDialog
           assignments={memberRoleAssignments}
           canManageCovil={canManageCovilDetails}
+          canSetMemberLimit={admin?.isAdmin ?? false}
           canRemoveMembers={canRemoveMembers}
           covil={covil}
           currentUser={currentUser}
@@ -320,6 +337,7 @@ export function WorkspaceView({
           onRemoveMember={onRemoveMember}
           onSetMemberRole={onSetMemberRole}
           onUpdateCovilName={onUpdateCovilName}
+          onUpdateMemberLimit={onUpdateCovilMemberLimit}
           roles={roles}
         />
       )}

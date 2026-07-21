@@ -121,12 +121,15 @@ function DemoWorkspace({ ultraEconomy, onToggleUltraEconomy }: { ultraEconomy: b
 
 function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user: User; ultraEconomy: boolean; onToggleUltraEconomy: () => void }) {
   const workspace = useCovilWorkspace(supabase!, user)
+  const admin = useAdminConsole(supabase!)
 
   if (workspace.isLoading) return <LoadingScreen label="Sincronizando seu grupo" />
 
   if (!workspace.covil) {
+    if (admin.isLoading) return <LoadingScreen label="Verificando suas permissões" />
     return (
       <OnboardingScreen
+        canCreate={admin.isAdmin}
         error={workspace.error}
         isSubmitting={workspace.isSubmitting}
         onCreate={workspace.createCovil}
@@ -142,6 +145,9 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
 
   return (
     <ConnectedWorkspaceReady
+      key={workspace.covil.id}
+      admin={admin}
+      availableCovils={workspace.availableCovils}
       channels={workspace.channels}
       covil={workspace.covil}
       currentUser={workspace.currentUser}
@@ -156,6 +162,10 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
       onRefreshInvite={workspace.refreshInvite}
       onRotateInvite={workspace.rotateInvite}
       onUpdateCovilName={workspace.updateCovilName}
+      onUpdateCovilMemberLimit={workspace.updateCovilMemberLimit}
+      onCreateCovil={workspace.createCovil}
+      onJoinCovil={workspace.joinCovil}
+      onSwitchCovil={workspace.switchCovil}
       currentPermissions={workspace.currentPermissions}
       roles={workspace.roles}
       memberRoleAssignments={workspace.memberRoleAssignments}
@@ -185,6 +195,8 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
 }
 
 interface ConnectedWorkspaceReadyProps {
+  admin: ReturnType<typeof useAdminConsole>
+  availableCovils: ReturnType<typeof useCovilWorkspace>['availableCovils']
   user: User
   covil: NonNullable<ReturnType<typeof useCovilWorkspace>['covil']>
   channels: Channel[]
@@ -202,6 +214,10 @@ interface ConnectedWorkspaceReadyProps {
   onRefreshInvite: () => Promise<string>
   onRotateInvite: () => Promise<string>
   onUpdateCovilName: ReturnType<typeof useCovilWorkspace>['updateCovilName']
+  onUpdateCovilMemberLimit: ReturnType<typeof useCovilWorkspace>['updateCovilMemberLimit']
+  onCreateCovil: ReturnType<typeof useCovilWorkspace>['createCovil']
+  onJoinCovil: ReturnType<typeof useCovilWorkspace>['joinCovil']
+  onSwitchCovil: ReturnType<typeof useCovilWorkspace>['switchCovil']
   currentPermissions: ReturnType<typeof useCovilWorkspace>['currentPermissions']
   roles: ReturnType<typeof useCovilWorkspace>['roles']
   memberRoleAssignments: ReturnType<typeof useCovilWorkspace>['memberRoleAssignments']
@@ -226,6 +242,8 @@ interface ConnectedWorkspaceReadyProps {
 }
 
 function ConnectedWorkspaceReady({
+  admin,
+  availableCovils,
   user,
   covil,
   channels,
@@ -243,6 +261,10 @@ function ConnectedWorkspaceReady({
   onRefreshInvite,
   onRotateInvite,
   onUpdateCovilName,
+  onUpdateCovilMemberLimit,
+  onCreateCovil,
+  onJoinCovil,
+  onSwitchCovil,
   currentPermissions,
   roles,
   memberRoleAssignments,
@@ -285,7 +307,6 @@ function ConnectedWorkspaceReady({
     enableSpeakingDetection: !ultraEconomy,
     screenShareConstraints: ultraEconomy ? ULTRA_ECONOMY_SCREEN_CONSTRAINTS : undefined,
   })
-  const admin = useAdminConsole(supabase!)
   const setServerMuted = voice.setServerMuted
   const leaveVoice = voice.leave
   const joinVoice = voice.join
@@ -341,6 +362,7 @@ function ConnectedWorkspaceReady({
 
   return (
     <WorkspaceView
+      availableCovils={availableCovils}
       channels={channels}
       covil={covil}
       currentUser={currentUser}
@@ -362,6 +384,10 @@ function ConnectedWorkspaceReady({
       onRefreshInvite={onRefreshInvite}
       onRotateInvite={onRotateInvite}
       onUpdateCovilName={onUpdateCovilName}
+      onUpdateCovilMemberLimit={onUpdateCovilMemberLimit}
+      onCreateCovil={onCreateCovil}
+      onJoinCovil={onJoinCovil}
+      onSwitchCovil={onSwitchCovil}
       onCreateChannel={onCreateChannel}
       onReorderChannels={onReorderChannels}
       onCreateRole={onCreateRole}

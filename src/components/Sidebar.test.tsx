@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Channel, Covil, Profile } from '../types/domain'
 import { Sidebar } from './Sidebar'
 
-const covil: Covil = { id: 'covil', inviteCode: '', name: 'Meu Covil' }
+const covil: Covil = { id: 'covil', inviteCode: '', memberLimit: 6, name: 'Meu Covil' }
 const currentUser: Profile = {
   avatarColor: '#7a8cff',
   displayName: 'Tuneco',
@@ -18,7 +18,7 @@ const channels: Channel[] = [
 ]
 
 describe('Sidebar', () => {
-  it('abre as configurações ao clicar no nome do Covil quando autorizado', () => {
+  it('abre o seletor e as configurações do Covil quando autorizado', () => {
     const onOpenCovilSettings = vi.fn()
     render(
       <Sidebar
@@ -34,8 +34,41 @@ describe('Sidebar', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Configurações de Meu Covil' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar de Covil. Atual: Meu Covil' }))
+    fireEvent.click(screen.getByRole('button', { name: /Configurar atual/ }))
     expect(onOpenCovilSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra a criação de Covil somente para o proprietário da aplicação', () => {
+    const { rerender } = render(
+      <Sidebar
+        channels={channels}
+        covil={covil}
+        currentChannelId="geral"
+        currentUser={currentUser}
+        onCreateCovil={vi.fn(async () => undefined)}
+        onSelectChannel={vi.fn()}
+        voiceChannelId={null}
+        voiceStatus="idle"
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar de Covil. Atual: Meu Covil' }))
+    expect(screen.queryByRole('button', { name: /Criar novo Covil/ })).not.toBeInTheDocument()
+
+    rerender(
+      <Sidebar
+        channels={channels}
+        covil={covil}
+        currentChannelId="geral"
+        currentUser={currentUser}
+        isAppAdmin
+        onCreateCovil={vi.fn(async () => undefined)}
+        onSelectChannel={vi.fn()}
+        voiceChannelId={null}
+        voiceStatus="idle"
+      />,
+    )
+    expect(screen.getByRole('button', { name: /Criar novo Covil/ })).toBeInTheDocument()
   })
 
   it('permite arrastar canais do mesmo tipo para reordená-los', () => {
@@ -64,5 +97,30 @@ describe('Sidebar', () => {
     fireEvent.drop(target, { dataTransfer })
 
     expect(onReorderChannels).toHaveBeenCalledWith('text', ['codigos', 'geral'])
+  })
+
+  it('lista e alterna entre os Covils do membro', () => {
+    const onSwitchCovil = vi.fn(async () => undefined)
+    render(
+      <Sidebar
+        availableCovils={[
+          { id: 'covil', memberLimit: 6, name: 'Meu Covil', role: 'owner' },
+          { id: 'outro', memberLimit: 4, name: 'Covil da Resenha', role: 'member' },
+        ]}
+        channels={channels}
+        covil={covil}
+        currentChannelId="geral"
+        currentUser={currentUser}
+        onSelectChannel={vi.fn()}
+        onSwitchCovil={onSwitchCovil}
+        voiceChannelId={null}
+        voiceStatus="idle"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar de Covil. Atual: Meu Covil' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Covil da Resenha/ }))
+
+    expect(onSwitchCovil).toHaveBeenCalledWith('outro')
   })
 })

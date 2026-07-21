@@ -3,25 +3,32 @@ import { ArrowRight, KeyRound, LoaderCircle, Plus } from 'lucide-react'
 import { BrandMark } from '../../components/BrandMark'
 
 interface OnboardingScreenProps {
+  canCreate: boolean
   isSubmitting: boolean
   error: string | null
-  onCreate: (name: string) => Promise<void>
+  onCreate: (name: string, memberLimit: number) => Promise<void>
   onJoin: (inviteCode: string) => Promise<void>
 }
 
 export function OnboardingScreen({
+  canCreate,
   isSubmitting,
   error,
   onCreate,
   onJoin,
 }: OnboardingScreenProps) {
-  const [mode, setMode] = useState<'create' | 'join'>('create')
+  const [mode, setMode] = useState<'create' | 'join'>(canCreate ? 'create' : 'join')
   const [value, setValue] = useState('')
+  const [memberLimit, setMemberLimit] = useState(6)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (mode === 'create') await onCreate(value.trim())
-    else await onJoin(value.trim().toUpperCase())
+    try {
+      if (mode === 'create') await onCreate(value.trim(), memberLimit)
+      else await onJoin(value.trim().toUpperCase())
+    } catch {
+      // O hook exibe a mensagem sanitizada devolvida pelo backend.
+    }
   }
 
   return (
@@ -30,17 +37,19 @@ export function OnboardingScreen({
       <section className="onboarding-content">
         <p className="eyebrow">PRIMEIRO PASSO</p>
         <h1>Onde sua equipe vai se encontrar?</h1>
-        <p>Crie um espaço privado ou use o convite enviado por um amigo.</p>
+        <p>{canCreate ? 'Crie um espaço privado ou use o convite enviado por um amigo.' : 'Use o convite enviado pelo fundador de um Covil.'}</p>
 
         <div className="onboarding-tabs" role="tablist" aria-label="Forma de entrada">
-          <button
-            aria-selected={mode === 'create'}
-            className={mode === 'create' ? 'is-active' : ''}
-            onClick={() => { setMode('create'); setValue('') }}
-            role="tab"
-          >
-            <Plus size={19} /> Criar Covil
-          </button>
+          {canCreate && (
+            <button
+              aria-selected={mode === 'create'}
+              className={mode === 'create' ? 'is-active' : ''}
+              onClick={() => { setMode('create'); setValue('') }}
+              role="tab"
+            >
+              <Plus size={19} /> Criar Covil
+            </button>
+          )}
           <button
             aria-selected={mode === 'join'}
             className={mode === 'join' ? 'is-active' : ''}
@@ -63,6 +72,14 @@ export function OnboardingScreen({
               value={value}
             />
           </label>
+          {mode === 'create' && (
+            <label>
+              <span>Máximo de membros</span>
+              <select onChange={(event) => setMemberLimit(Number(event.target.value))} value={memberLimit}>
+                {[1, 2, 3, 4, 5, 6].map((limit) => <option key={limit} value={limit}>{limit}</option>)}
+              </select>
+            </label>
+          )}
           {error && <p className="form-feedback form-feedback--error">{error}</p>}
           <button className="primary-button" disabled={isSubmitting} type="submit">
             {isSubmitting ? <LoaderCircle className="spin" size={19} /> : null}

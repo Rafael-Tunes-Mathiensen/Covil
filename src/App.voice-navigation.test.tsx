@@ -39,7 +39,7 @@ vi.mock('./features/covil/useCovilWorkspace', async () => {
       const [selectedChannelId, setSelectedChannelId] = React.useState('lobby')
       return {
         channels: [...channels],
-        covil: { id: 'covil', name: 'Covil de teste', inviteCode: 'CONVITE' },
+        covil: { id: 'covil', name: 'Covil de teste', inviteCode: 'CONVITE', memberLimit: 6 },
         createChannel: vi.fn(),
         createCovil: vi.fn(),
         createRole: vi.fn(),

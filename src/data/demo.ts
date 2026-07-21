@@ -4,6 +4,7 @@ export const demoCovil: Covil = {
   id: 'demo-covil',
   name: 'Covil da Madrugada',
   inviteCode: '4F2A8C71D930B5E6287C41AD9B05E37',
+  memberLimit: 6,
 }
 
 export const demoChannels: Channel[] = [

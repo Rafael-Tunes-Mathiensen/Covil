@@ -14,6 +14,7 @@ import { Dialog } from './Dialog'
 interface CovilSettingsDialogProps {
   assignments: readonly MemberRoleAssignment[]
   canManageCovil: boolean
+  canSetMemberLimit?: boolean
   canRemoveMembers: boolean
   covil: Covil
   currentUser: Profile
@@ -26,6 +27,7 @@ interface CovilSettingsDialogProps {
   onRemoveMember: (userId: string) => Promise<unknown>
   onSetMemberRole: (userId: string, roleId: string, assigned: boolean) => Promise<unknown>
   onUpdateCovilName: (name: string) => Promise<unknown>
+  onUpdateMemberLimit?: (memberLimit: number) => Promise<unknown>
   onUpdateRole: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
 }
 
@@ -53,10 +55,10 @@ const roleColors = ['#ff7043', '#7a8cff', '#55c98a', '#d58cff', '#e8b35d']
 export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
   const isOwner = props.currentUser.role === 'owner'
   const [tab, setTab] = useState<'general' | 'roles' | 'members'>(
-    props.canManageCovil ? 'general' : isOwner ? 'roles' : 'members',
+    props.canManageCovil || props.canSetMemberLimit ? 'general' : isOwner ? 'roles' : 'members',
   )
   const tabs = [
-    ...(props.canManageCovil ? ['general'] as const : []),
+    ...(props.canManageCovil || props.canSetMemberLimit ? ['general'] as const : []),
     ...(isOwner ? ['roles'] as const : []),
     'members' as const,
   ]
@@ -79,7 +81,7 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
       title="Configurações do Covil"
     >
       <div className="settings-tabs" onKeyDown={handleTabKey} role="tablist" aria-label="Configurações do Covil">
-        {props.canManageCovil && (
+        {(props.canManageCovil || props.canSetMemberLimit) && (
           <button
             aria-selected={tab === 'general'}
             aria-controls="covil-panel-general"
@@ -124,7 +126,7 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
         id={`covil-panel-${tab}`}
         role="tabpanel"
       >
-        {tab === 'general' && props.canManageCovil
+        {tab === 'general' && (props.canManageCovil || props.canSetMemberLimit)
           ? <GeneralPane {...props} />
           : tab === 'roles' && isOwner
             ? <RolesPane {...props} />
@@ -134,10 +136,21 @@ export function CovilSettingsDialog(props: CovilSettingsDialogProps) {
   )
 }
 
-function GeneralPane({ covil, isSubmitting, onUpdateCovilName }: CovilSettingsDialogProps) {
+function GeneralPane({
+  canManageCovil,
+  canSetMemberLimit,
+  covil,
+  isSubmitting,
+  members,
+  onUpdateCovilName,
+  onUpdateMemberLimit,
+}: CovilSettingsDialogProps) {
   const [name, setName] = useState(covil.name)
+  const [memberLimit, setMemberLimit] = useState(covil.memberLimit)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [limitError, setLimitError] = useState<string | null>(null)
+  const [limitSuccess, setLimitSuccess] = useState<string | null>(null)
   const normalizedName = name.trim()
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -153,31 +166,76 @@ function GeneralPane({ covil, isSubmitting, onUpdateCovilName }: CovilSettingsDi
     }
   }
 
+  async function saveMemberLimit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!onUpdateMemberLimit || memberLimit < members.length || memberLimit > 6 || isSubmitting) return
+    setLimitError(null)
+    setLimitSuccess(null)
+    try {
+      await onUpdateMemberLimit(memberLimit)
+      setLimitSuccess(`Limite atualizado para ${memberLimit} membros.`)
+    } catch (cause) {
+      setLimitError(cause instanceof Error ? cause.message : 'Não foi possível atualizar o limite.')
+    }
+  }
+
   return (
     <section className="settings-section covil-general-settings">
-      <header>
-        <div><Settings2 size={18} /><span><strong>Identidade do Covil</strong><small>O novo nome aparece para todos os membros em tempo real.</small></span></div>
-      </header>
-      <form className="covil-general-form" onSubmit={save}>
-        <label className="field-label" htmlFor="covil-name">Nome do Covil</label>
-        <input
-          id="covil-name"
-          maxLength={60}
-          minLength={2}
-          onChange={(event) => setName(event.target.value)}
-          value={name}
-        />
-        <small>{normalizedName.length}/60 caracteres</small>
-        {error && <p className="dialog-error" role="alert">{error}</p>}
-        {success && <p className="dialog-success" role="status">{success}</p>}
-        <button
-          className="primary-button primary-button--compact"
-          disabled={normalizedName.length < 2 || normalizedName.length > 60 || normalizedName === covil.name || isSubmitting}
-          type="submit"
-        >
-          <Check size={17} /> Salvar alterações
-        </button>
-      </form>
+      {canManageCovil && (
+        <>
+          <header>
+            <div><Settings2 size={18} /><span><strong>Identidade do Covil</strong><small>O novo nome aparece para todos os membros em tempo real.</small></span></div>
+          </header>
+          <form className="covil-general-form" onSubmit={save}>
+            <label className="field-label" htmlFor="covil-name">Nome do Covil</label>
+            <input
+              id="covil-name"
+              maxLength={60}
+              minLength={2}
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+            <small>{normalizedName.length}/60 caracteres</small>
+            {error && <p className="dialog-error" role="alert">{error}</p>}
+            {success && <p className="dialog-success" role="status">{success}</p>}
+            <button
+              className="primary-button primary-button--compact"
+              disabled={normalizedName.length < 2 || normalizedName.length > 60 || normalizedName === covil.name || isSubmitting}
+              type="submit"
+            >
+              <Check size={17} /> Salvar alterações
+            </button>
+          </form>
+        </>
+      )}
+      {canSetMemberLimit && onUpdateMemberLimit && (
+        <form className="covil-general-form covil-limit-form" onSubmit={saveMemberLimit}>
+          <div className="covil-limit-form__heading">
+            <strong>Capacidade do Covil</strong>
+            <small>Somente o proprietário da aplicação pode alterar este limite.</small>
+          </div>
+          <label className="field-label" htmlFor="covil-member-limit">Máximo de membros</label>
+          <select
+            id="covil-member-limit"
+            onChange={(event) => setMemberLimit(Number(event.target.value))}
+            value={memberLimit}
+          >
+            {[1, 2, 3, 4, 5, 6].map((limit) => (
+              <option disabled={limit < members.length} key={limit} value={limit}>{limit}</option>
+            ))}
+          </select>
+          <small>{members.length} membro(s) atualmente · teto da plataforma: 6</small>
+          {limitError && <p className="dialog-error" role="alert">{limitError}</p>}
+          {limitSuccess && <p className="dialog-success" role="status">{limitSuccess}</p>}
+          <button
+            className="primary-button primary-button--compact"
+            disabled={memberLimit === covil.memberLimit || memberLimit < members.length || isSubmitting}
+            type="submit"
+          >
+            <UsersRound size={17} /> Salvar capacidade
+          </button>
+        </form>
+      )}
     </section>
   )
 }

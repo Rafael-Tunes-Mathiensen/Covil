@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCovilWorkspace } from './useCovilWorkspace'
 
 const memberId = 'member-user-id'
@@ -8,6 +8,8 @@ const covilId = 'covil-id'
 
 interface FakeWorkspaceState {
   currentRole: 'owner' | 'member'
+  memberships: Array<{ covil_id: string; role: 'owner' | 'member' }>
+  covils: Array<{ id: string; name: string; member_limit: number }>
   channels: Array<{ id: string; covil_id: string; name: string; kind: 'text' | 'voice'; position: number }>
   members: Array<{ user_id: string; role: 'owner' | 'member' }>
   messages: Array<{ id: string; channel_id: string; author_id: string; content: string; created_at: string; updated_at?: string }>
@@ -104,16 +106,12 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
     }
 
     if (this.table === 'covil_members' && this.columns === 'covil_id, role') {
-      const isCurrentMember = this.filters.get('user_id') === memberId
-      return {
-        data: [{ covil_id: covilId, role: isCurrentMember ? this.state.currentRole : 'owner' }],
-        error: null,
-      }
+      return { data: this.state.memberships, error: null }
     }
 
     if (this.table === 'covil_members') return { data: this.state.members, error: null }
     if (this.table === 'covils') {
-      return { data: { id: covilId, name: 'Covil dos amigos' }, error: null }
+      return { data: this.state.covils, error: null }
     }
     if (this.table === 'channels') return { data: this.state.channels, error: null }
     if (this.table === 'profiles') return { data: this.state.profiles, error: null }
@@ -129,6 +127,8 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
 function createFakeClient(overrides: Partial<FakeWorkspaceState> = {}) {
   const state: FakeWorkspaceState = {
     currentRole: 'member',
+    memberships: [{ covil_id: covilId, role: 'member' }],
+    covils: [{ id: covilId, name: 'Covil dos amigos', member_limit: 6 }],
     channels: [],
     members: [{ user_id: memberId, role: 'member' }],
     messages: [],
@@ -187,6 +187,8 @@ const user = {
 } as unknown as User
 
 describe('useCovilWorkspace', () => {
+  beforeEach(() => window.localStorage.clear())
+
   it('carrega o papel do usuário conectado sem consultar o convite do owner', async () => {
     const { client, rpc } = createFakeClient()
     const { result } = renderHook(() => useCovilWorkspace(client, user))
@@ -198,9 +200,33 @@ describe('useCovilWorkspace', () => {
       id: covilId,
       name: 'Covil dos amigos',
       inviteCode: '',
+      memberLimit: 6,
     })
     expect(result.current.currentUser.role).toBe('member')
     expect(rpc).not.toHaveBeenCalledWith('get_covil_invite', expect.anything())
+  })
+
+  it('lista todos os Covils do usuário e persiste a seleção ativa', async () => {
+    const otherCovilId = 'outro-covil-id'
+    const fake = createFakeClient({
+      memberships: [
+        { covil_id: covilId, role: 'member' },
+        { covil_id: otherCovilId, role: 'owner' },
+      ],
+      covils: [
+        { id: covilId, name: 'Covil dos amigos', member_limit: 6 },
+        { id: otherCovilId, name: 'Covil da resenha', member_limit: 4 },
+      ],
+      currentRole: 'owner',
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.availableCovils).toHaveLength(2))
+    await act(() => result.current.switchCovil(otherCovilId))
+
+    await waitFor(() => expect(result.current.covil?.id).toBe(otherCovilId))
+    expect(result.current.covil?.memberLimit).toBe(4)
+    expect(window.localStorage.getItem('covil:active-covil')).toBe(otherCovilId)
   })
 
   it('atualiza a lista de membros quando alguém entra no Covil', async () => {

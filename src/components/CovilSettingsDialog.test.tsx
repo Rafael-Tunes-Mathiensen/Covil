@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CovilSettingsDialog } from './CovilSettingsDialog'
 import type { CovilRole, Profile } from '../types/domain'
 
-const covil = { id: 'covil', inviteCode: '', name: 'Meu Covil' }
+const covil = { id: 'covil', inviteCode: '', memberLimit: 6, name: 'Meu Covil' }
 
 const owner: Profile = {
   id: 'owner',
@@ -144,5 +144,35 @@ describe('CovilSettingsDialog', () => {
 
     await waitFor(() => expect(onUpdateCovilName).toHaveBeenCalledWith('Covil Renovado'))
     expect(screen.getByRole('status')).toHaveTextContent('Nome do Covil atualizado.')
+  })
+
+  it('permite ao proprietário da aplicação alterar a capacidade do Covil', async () => {
+    const onUpdateMemberLimit = vi.fn(async () => undefined)
+    render(
+      <CovilSettingsDialog
+        assignments={[]}
+        canManageCovil
+        canRemoveMembers
+        canSetMemberLimit
+        covil={covil}
+        currentUser={owner}
+        isSubmitting={false}
+        members={[owner]}
+        onClose={vi.fn()}
+        onCreateRole={vi.fn(async () => undefined)}
+        onDeleteRole={vi.fn(async () => undefined)}
+        onRemoveMember={vi.fn(async () => undefined)}
+        onSetMemberRole={vi.fn(async () => undefined)}
+        onUpdateCovilName={vi.fn(async () => undefined)}
+        onUpdateMemberLimit={onUpdateMemberLimit}
+        onUpdateRole={vi.fn(async () => undefined)}
+        roles={[]}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Máximo de membros'), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar capacidade' }))
+
+    await waitFor(() => expect(onUpdateMemberLimit).toHaveBeenCalledWith(4))
   })
 })

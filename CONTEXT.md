@@ -2,9 +2,11 @@
 
 ## Termos canônicos
 
-- **Covil**: grupo privado de até seis pessoas, com canais, cargos e mensagens próprios.
+- **Proprietário da aplicação**: conta global mantida na allowlist administrativa. É a única identidade que pode criar Covils e definir a capacidade de cada um.
+- **Covil**: grupo privado com capacidade configurável de uma a seis pessoas, canais, cargos e mensagens próprios.
+- **Covil ativo**: Covil selecionado no momento pela pessoa entre aqueles dos quais participa.
 - **Fundador**: único membro `owner` do Covil. Possui todas as permissões e não pode ser removido nem moderado por cargos delegados.
-- **Membro**: pessoa autenticada que pertence ao Covil como `member`.
+- **Membro**: pessoa autenticada que pertence a um ou mais Covils como `member`.
 - **Cargo**: identidade nomeada e reutilizável, com cor própria, criada e atribuída pelo Fundador. Pode ser apenas visual ou também conceder permissões; um membro pode acumular vários cargos.
 - **Permissão**: capacidade operacional autorizada pelo banco. É opcional em um cargo e pode conceder `manage_channels`, `moderate_voice`, `remove_members` ou `manage_covil`.
 - **Canal de texto**: espaço persistente para mensagens.
@@ -15,6 +17,9 @@
 ## Regras do domínio
 
 - Existe exatamente um Fundador por Covil e ele sempre possui todas as permissões.
+- Somente o Proprietário da aplicação pode criar Covils e alterar sua capacidade.
+- A capacidade não pode ser reduzida abaixo da quantidade atual de membros nem ultrapassar seis.
+- Alternar o Covil ativo muda o contexto de canais, mensagens, cargos e chamadas sem misturar dados entre Covils.
 - Somente o Fundador cria, exclui e atribui cargos; os cargos delegam ações operacionais, não o controle dos próprios cargos.
 - As permissões efetivas de um membro são a união das permissões de todos os cargos atribuídos a ele.
 - Um cargo sem permissões continua válido e visível ao lado do nome do membro.

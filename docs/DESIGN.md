@@ -6,7 +6,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 
 ## Plano de conteúdo
 
-1. **Navegação:** nome do Covil, canais de texto, salas de voz, lista compacta de ocupantes e ações autorizadas.
+1. **Navegação:** seletor de Covils, canais de texto, salas de voz, lista compacta de ocupantes e ações autorizadas.
 2. **Área principal:** conversa ou compartilhamento de tela, nunca os dois disputando atenção.
 3. **Contexto:** participantes e estado de voz em um painel recolhível.
 4. **Ação persistente:** controles essenciais da chamada em uma barra inferior.
@@ -25,7 +25,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 - Digitar `/` abre comandos com descrição; votação, roleta e dado usam diálogos focados e animações breves.
 - Cargos visuais aparecem como rótulos compactos junto aos nomes, sem sugerir uma permissão que não exista.
 - Formulários de cargos preservam fundo escuro, texto claro e amostras com a cor real escolhida; a gestão de membros reutiliza as fotos dos perfis.
-- O nome do Covil funciona como acesso discreto às configurações apenas quando o membro tem autorização; autores do chat usam botões transparentes e texto de alto contraste.
+- O nome do Covil abre o seletor lateral; nele, configurações aparecem apenas com autorização e a criação de outro Covil somente para o proprietário da aplicação.
 - Ícones ativos, botões e estados de hover usam escala ou deslocamento mínimo para confirmar a ação.
 
 ## Movimento, som e acessibilidade

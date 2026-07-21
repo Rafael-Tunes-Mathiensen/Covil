@@ -83,16 +83,30 @@ migration também preenche perfis ausentes de usuários que já existiam.
 
 ### Criar um Covil
 
-Não insira diretamente em `covils` ou `covil_members`. Use a RPC atômica:
+Não insira diretamente em `covils` ou `covil_members`. Somente a conta registrada
+em `private.app_admins` pode usar a RPC atômica:
 
 ```ts
-const { data: covil, error } = await supabase.rpc('create_covil', {
+const { data: covil, error } = await supabase.rpc('create_covil_with_limit', {
   p_name: 'Covil dos Amigos',
+  p_member_limit: 4,
 })
 ```
 
 Ela valida o nome, gera um convite aleatório de 128 bits, registra o usuário atual como
-`owner` e cria os canais `geral` (texto) e `Lobby` (voz).
+`owner`, define uma capacidade entre 1 e 6 e cria os canais `geral` (texto) e `Lobby` (voz).
+`create_covil(p_name)` permanece como variante compatível, com capacidade inicial 6,
+mas aplica a mesma autorização exclusiva.
+
+O proprietário da aplicação pode alterar a capacidade posteriormente, desde que
+ela não fique abaixo da ocupação atual:
+
+```ts
+await supabase.rpc('update_covil_member_limit', {
+  p_covil_id: covilId,
+  p_member_limit: 5,
+})
+```
 
 ### Entrar por convite
 
@@ -106,8 +120,8 @@ const { data: covil, error } = await supabase.rpc(
 A associação não é duplicada se o usuário já for membro. Cada código aceita uma
 única entrada: ele é substituído atomicamente no primeiro uso, inclusive quando
 duas tentativas chegam ao mesmo tempo. O código pode ser digitado em maiúsculas
-ou minúsculas. O banco rejeita uma sétima associação mesmo sob tentativas
-concorrentes.
+ou minúsculas. O banco rejeita uma associação acima da capacidade configurada,
+mesmo sob tentativas concorrentes. Uma mesma conta pode participar de vários Covils.
 
 ### Criar canais
 
@@ -345,9 +359,9 @@ para usuários autenticados que passam pelas policies acima.
 | Ler perfil | Próprio perfil ou usuário com Covil compartilhado |
 | Atualizar perfil | Próprio usuário; somente `display_name`, `avatar_url` e `bio` |
 | Enviar/remover avatar | Próprio usuário e somente na pasta do próprio UUID; bucket público para leitura por URL |
-| Criar Covil | Somente pela RPC `create_covil` autenticada |
+| Criar Covil | Somente o app owner allowlisted, pelas RPCs `create_covil` ou `create_covil_with_limit` |
 | Entrar em Covil | Somente pela RPC autenticada e com convite válido |
-| Lotação do Covil | Máximo de 6 memberships, garantido por trigger transacional |
+| Lotação do Covil | Limite próprio de 1 a 6, alterado somente pelo app owner e garantido por trigger transacional |
 | Consultar/renovar convite | Somente o owner, pelas RPCs dedicadas |
 | Atualizar nome do Covil | Pela RPC: owner ou cargo com `manage_covil`; apenas `name` é alterado |
 | Excluir Covil | Somente owner |
