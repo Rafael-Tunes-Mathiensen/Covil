@@ -12,7 +12,16 @@ interface FakeWorkspaceState {
   covils: Array<{ id: string; name: string; member_limit: number }>
   channels: Array<{ id: string; covil_id: string; name: string; kind: 'text' | 'voice'; position: number }>
   members: Array<{ user_id: string; role: 'owner' | 'member' }>
-  messages: Array<{ id: string; channel_id: string; author_id: string; content: string; created_at: string; updated_at?: string }>
+  messages: Array<{
+    id: string
+    channel_id: string
+    author_id: string
+    content: string
+    kind?: 'text' | 'poll' | 'command'
+    payload?: unknown
+    created_at: string
+    updated_at?: string
+  }>
   profiles: Array<{ id: string; display_name: string }>
   roles: Array<{
     id: string
@@ -328,6 +337,33 @@ describe('useCovilWorkspace', () => {
     await act(() => result.current.deleteMessage(messageId))
     expect(fake.state.messages).toHaveLength(0)
     await waitFor(() => expect(result.current.messages).toHaveLength(0))
+  })
+
+  it('impede a edição local de resultados de comandos', async () => {
+    const channelId = 'general-channel-id'
+    const messageId = 'dice-message-id'
+    const originalContent = '🎲 Dado de 1 a 6: 4'
+    const fake = createFakeClient({
+      channels: [{ id: channelId, covil_id: covilId, name: 'geral', kind: 'text', position: 0 }],
+      messages: [{
+        id: messageId,
+        channel_id: channelId,
+        author_id: memberId,
+        content: originalContent,
+        kind: 'command',
+        payload: { command: 'dice' },
+        created_at: '2026-07-19T17:00:00.000Z',
+        updated_at: '2026-07-19T17:00:00.000Z',
+      }],
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.messages[0]?.kind).toBe('command'))
+    await expect(result.current.editMessage(messageId, '🎲 Dado de 1 a 6: 6')).rejects.toThrow(
+      'Resultados de comandos e votações não podem ser editados.',
+    )
+
+    expect(fake.state.messages[0]?.content).toBe(originalContent)
   })
 
   it('combina cargos atribuídos nas permissões efetivas do usuário', async () => {

@@ -9,7 +9,8 @@ export const covilPermissions = [
 ] as const
 export type CovilPermission = (typeof covilPermissions)[number]
 export type VoiceModerationAction = 'mute' | 'unmute' | 'disconnect'
-export type MessageKind = 'text' | 'poll'
+export type MessageKind = 'text' | 'poll' | 'command'
+export type ChatCommandKind = 'roulette' | 'dice'
 
 export interface Covil {
   id: string
@@ -85,6 +86,7 @@ export interface ChatMessage {
   updatedAt?: string
   author: Profile
   kind?: MessageKind
+  command?: ChatCommandKind
   poll?: MessagePoll
 }
 

@@ -9,7 +9,7 @@ interface ChatCommandDialogProps {
   command: ChatCommand
   onClose: () => void
   onCreatePoll: (question: string, options: string[]) => Promise<void>
-  onSendResult: (content: string) => Promise<void>
+  onSendResult: (command: 'roulette' | 'dice', content: string) => Promise<void>
 }
 
 export function ChatCommandDialog({
@@ -117,7 +117,7 @@ function RouletteBuilder({
   onSendResult,
 }: {
   onClose: () => void
-  onSendResult: (content: string) => Promise<void>
+  onSendResult: (command: 'roulette', content: string) => Promise<void>
 }) {
   const [options, setOptions] = useState(['', ''])
   const [isSpinning, setIsSpinning] = useState(false)
@@ -138,7 +138,7 @@ function RouletteBuilder({
     const selected = values[selectedIndex]
     setResult(selected)
     try {
-      await onSendResult(`🎡 Roleta: ${selected} · opções: ${values.join(' / ')}`)
+      await onSendResult('roulette', `🎡 Roleta: ${selected} · opções: ${values.join(' / ')}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível publicar o resultado.')
     } finally {
@@ -201,7 +201,7 @@ function DiceBuilder({
   onSendResult,
 }: {
   onClose: () => void
-  onSendResult: (content: string) => Promise<void>
+  onSendResult: (command: 'dice', content: string) => Promise<void>
 }) {
   const [minimum, setMinimum] = useState(1)
   const [maximum, setMaximum] = useState(20)
@@ -219,7 +219,7 @@ function DiceBuilder({
     const value = randomIntInclusive(minimum, maximum)
     setResult(value)
     try {
-      await onSendResult(`🎲 Dado de ${minimum} a ${maximum}: ${value}`)
+      await onSendResult('dice', `🎲 Dado de ${minimum} a ${maximum}: ${value}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível publicar o resultado.')
     } finally {

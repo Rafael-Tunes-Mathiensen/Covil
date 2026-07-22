@@ -5,6 +5,7 @@ import type {
   Channel,
   ChannelKind,
   ChatMessage,
+  ChatCommandKind,
   Covil,
   CovilSummary,
   CovilPermission,
@@ -115,6 +116,12 @@ function parsePollOptions(payload: unknown) {
   return Array.isArray(options)
     ? options.filter((option): option is string => typeof option === 'string')
     : []
+}
+
+function parseCommand(payload: unknown): ChatCommandKind | undefined {
+  if (!payload || typeof payload !== 'object' || !('command' in payload)) return undefined
+  const { command } = payload as { command?: unknown }
+  return command === 'roulette' || command === 'dice' ? command : undefined
 }
 
 function mentionsProfile(content: string, displayName: string) {
@@ -390,6 +397,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
         createdAt: message.created_at,
         updatedAt: message.updated_at,
         kind: message.kind ?? 'text',
+        command: message.kind === 'command' ? parseCommand(message.payload) : undefined,
         poll: message.kind === 'poll'
           ? {
               options: parsePollOptions(message.payload),
@@ -614,6 +622,21 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     if (result.error) throw result.error
   }
 
+  async function sendCommandResult(command: ChatCommandKind, content: string) {
+    if (!selectedChannel || selectedChannel.kind !== 'text') {
+      throw new Error('Abra um canal de texto para usar o comando.')
+    }
+    const normalized = normalizeMessage(content)
+    if (!normalized) throw new Error('O resultado do comando está vazio.')
+
+    const result = await client.rpc('create_covil_command_result', {
+      p_channel_id: selectedChannel.id,
+      p_command: command,
+      p_content: normalized,
+    })
+    if (result.error) throw result.error
+  }
+
   async function createPoll(question: string, options: string[]) {
     if (!selectedChannel || selectedChannel.kind !== 'text') {
       throw new Error('Abra um canal de texto para criar a votação.')
@@ -636,6 +659,10 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
   }
 
   async function editMessage(messageId: string, content: string) {
+    const target = messages.find(({ id }) => id === messageId)
+    if (target && (target.kind ?? 'text') !== 'text') {
+      throw new Error('Resultados de comandos e votações não podem ser editados.')
+    }
     const normalized = normalizeMessage(content)
     if (!normalized) throw new Error('A mensagem não pode ficar vazia.')
 
@@ -946,6 +973,7 @@ export function useCovilWorkspace(client: SupabaseClient, user: User) {
     joinCovil,
     switchCovil,
     sendMessage,
+    sendCommandResult,
     createPoll,
     votePoll,
     editMessage,

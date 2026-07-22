@@ -99,7 +99,7 @@ export interface RemoteVoicePeer {
   participant: VoiceParticipant
   /** Contains every remote audio track and is played automatically by the hook. */
   audioStream: MediaStream
-  /** Present while this peer publishes a screen video track. */
+  /** Present while this peer publishes screen video and optional shared audio. */
   screenStream: MediaStream | null
   connectionState: RTCPeerConnectionState
 }

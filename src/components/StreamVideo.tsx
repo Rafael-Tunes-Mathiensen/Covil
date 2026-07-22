@@ -16,6 +16,7 @@ export function StreamVideo({ stream, muted = false, label }: StreamVideoProps) 
     const playback = video.play()
     if (playback) void playback.catch(() => undefined)
     return () => {
+      video.pause()
       video.srcObject = null
     }
   }, [stream])

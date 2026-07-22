@@ -65,6 +65,20 @@ function DemoWorkspace({ ultraEconomy, onToggleUltraEconomy }: { ultraEconomy: b
     setMessages((current) => [...current, message])
   }
 
+  async function sendCommandResult(command: 'roulette' | 'dice', content: string) {
+    const message: ChatMessage = {
+      id: crypto.randomUUID(),
+      channelId: selectedChannel.id,
+      authorId: currentUser.id,
+      content,
+      createdAt: new Date().toISOString(),
+      author: currentUser,
+      kind: 'command',
+      command,
+    }
+    setMessages((current) => [...current, message])
+  }
+
   async function editMessage(messageId: string, content: string) {
     setMessages((current) => current.map((message) => (
       message.id === messageId
@@ -112,6 +126,7 @@ function DemoWorkspace({ ultraEconomy, onToggleUltraEconomy }: { ultraEconomy: b
       onEditMessage={editMessage}
       onSelectChannel={setSelectedChannel}
       onSendMessage={sendMessage}
+      onSendCommandResult={sendCommandResult}
       selectedChannel={selectedChannel}
       voice={voice}
       voiceChannel={voiceChannel}
@@ -155,6 +170,7 @@ function ConnectedWorkspace({ user, ultraEconomy, onToggleUltraEconomy }: { user
       messages={workspace.messages}
       onSelectChannel={(channel) => workspace.setSelectedChannelId(channel.id)}
       onSendMessage={workspace.sendMessage}
+      onSendCommandResult={workspace.sendCommandResult}
       onEditMessage={workspace.editMessage}
       onDeleteMessage={workspace.deleteMessage}
       onCreatePoll={workspace.createPoll}
@@ -207,6 +223,7 @@ interface ConnectedWorkspaceReadyProps {
   messages: ChatMessage[]
   onSelectChannel: (channel: Channel) => void
   onSendMessage: (content: string) => Promise<void>
+  onSendCommandResult: ReturnType<typeof useCovilWorkspace>['sendCommandResult']
   onEditMessage: (messageId: string, content: string) => Promise<void>
   onDeleteMessage: (messageId: string) => Promise<void>
   onCreatePoll: ReturnType<typeof useCovilWorkspace>['createPoll']
@@ -254,6 +271,7 @@ function ConnectedWorkspaceReady({
   messages,
   onSelectChannel,
   onSendMessage,
+  onSendCommandResult,
   onEditMessage,
   onDeleteMessage,
   onCreatePoll,
@@ -377,6 +395,7 @@ function ConnectedWorkspaceReady({
       onSelectChannel={selectChannel}
       onJoinVoiceChannel={joinVoiceChannel}
       onSendMessage={onSendMessage}
+      onSendCommandResult={onSendCommandResult}
       onEditMessage={onEditMessage}
       onDeleteMessage={onDeleteMessage}
       onCreatePoll={onCreatePoll}

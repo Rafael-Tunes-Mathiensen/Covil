@@ -13,6 +13,7 @@ import {
   Dices,
   Hash,
   Pencil,
+  LockKeyhole,
   RotateCw,
   Send,
   Trash2,
@@ -43,6 +44,7 @@ interface ChatPanelProps {
   onCreatePoll: (question: string, options: string[]) => Promise<void>
   onOpenProfile?: (profile: Profile) => void
   onSend: (content: string) => Promise<void>
+  onSendCommandResult: (command: 'roulette' | 'dice', content: string) => Promise<void>
   onToggleMembers: () => void
   onVotePoll: (messageId: string, optionIndex: number) => Promise<void>
 }
@@ -95,6 +97,7 @@ export function ChatPanel({
   onCreatePoll,
   onOpenProfile,
   onSend,
+  onSendCommandResult,
   onToggleMembers,
   onVotePoll,
 }: ChatPanelProps) {
@@ -343,6 +346,7 @@ export function ChatPanel({
             previous?.authorId === message.authorId &&
             new Date(message.createdAt).getTime() - new Date(previous.createdAt).getTime() < 5 * 60_000
           const canManage = message.authorId === currentUserId
+          const canEdit = canManage && (message.kind ?? 'text') === 'text'
           const authorRole = roleByMember.get(message.authorId)
           const wasEdited = Boolean(
             message.updatedAt &&
@@ -409,6 +413,11 @@ export function ChatPanel({
                 ) : (
                   <p>
                     <MessageContent content={message.content} currentUserId={currentUserId} members={members} />
+                    {message.kind === 'command' && (
+                      <small className="message__command-lock" title="Resultados de comandos não podem ser editados">
+                        <LockKeyhole size={11} /> /{message.command === 'roulette' ? 'roleta' : 'dado'}
+                      </small>
+                    )}
                     {wasEdited && <small className="message__edited">(editada)</small>}
                   </p>
                 )}
@@ -416,7 +425,7 @@ export function ChatPanel({
               </div>
               {canManage && editingMessageId !== message.id && (
                 <div className="message__actions">
-                  <button aria-label="Editar mensagem" disabled={busyMessageId === message.id} onClick={() => beginEdit(message)} title="Editar" type="button"><Pencil size={14} /></button>
+                  {canEdit && <button aria-label="Editar mensagem" disabled={busyMessageId === message.id} onClick={() => beginEdit(message)} title="Editar" type="button"><Pencil size={14} /></button>}
                   <button
                     aria-label={deleteConfirmId === message.id ? 'Confirmar exclusão da mensagem' : 'Excluir mensagem'}
                     className={deleteConfirmId === message.id ? 'is-confirming' : ''}
@@ -515,7 +524,7 @@ export function ChatPanel({
         command={activeCommand}
         onClose={() => setActiveCommand(null)}
         onCreatePoll={onCreatePoll}
-        onSendResult={onSend}
+        onSendResult={onSendCommandResult}
       />
     )}
     </>

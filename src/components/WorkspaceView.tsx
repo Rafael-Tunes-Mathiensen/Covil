@@ -44,6 +44,7 @@ interface WorkspaceViewProps {
   onSelectChannel: (channel: Channel) => void
   onJoinVoiceChannel?: (channel: Channel) => Promise<void>
   onSendMessage: (content: string) => Promise<void>
+  onSendCommandResult: (command: 'roulette' | 'dice', content: string) => Promise<void>
   onCreatePoll: (question: string, options: string[]) => Promise<void>
   onVotePoll: (messageId: string, optionIndex: number) => Promise<void>
   onEditMessage: (messageId: string, content: string) => Promise<void>
@@ -95,6 +96,7 @@ export function WorkspaceView({
   onSelectChannel,
   onJoinVoiceChannel,
   onSendMessage,
+  onSendCommandResult,
   onCreatePoll,
   onVotePoll,
   onEditMessage,
@@ -250,6 +252,7 @@ export function WorkspaceView({
             onVotePoll={onVotePoll}
             onOpenProfile={(profile) => setSelectedProfileId(profile.id)}
             onSend={onSendMessage}
+            onSendCommandResult={onSendCommandResult}
             onToggleMembers={() => setShowMembers((value) => !value)}
             roles={roles}
           />

@@ -109,4 +109,44 @@ describe('VoiceRoomPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ver pessoas/ }))
     expect(container.querySelector('.screen-layout')).toHaveClass('is-people-focused')
   })
+
+  it('exige uma ação para assistir e permite parar uma transmissão remota', () => {
+    const screenStream = {
+      getAudioTracks: () => [{}],
+      getVideoTracks: () => [{}],
+    } as unknown as MediaStream
+    const voice = {
+      error: null,
+      isScreenSharing: false,
+      localScreenStream: null,
+      participants: [{ id: owner.id, displayName: owner.displayName }, { id: member.id, displayName: member.displayName }],
+      remotePeers: [{
+        participant: { id: member.id, displayName: member.displayName },
+        audioStream: {} as MediaStream,
+        screenStream,
+        connectionState: 'connected',
+      }],
+      speakingParticipantIds: new Set<string>(),
+      status: 'joined',
+      join: vi.fn(async () => undefined),
+    } as unknown as UseVoiceRoomResult
+
+    render(
+      <VoiceRoomPanel
+        currentUser={owner}
+        isConnectedRoom
+        isDemo={false}
+        members={[owner, member]}
+        onToggleMembers={vi.fn()}
+        roomName="Lobby"
+        voice={voice}
+      />,
+    )
+
+    expect(screen.queryByLabelText('Tela compartilhada por Nina')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Assistir transmissão de Nina' }))
+    expect(screen.getByLabelText('Tela compartilhada por Nina')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Parar de assistir' }))
+    expect(screen.queryByLabelText('Tela compartilhada por Nina')).not.toBeInTheDocument()
+  })
 })

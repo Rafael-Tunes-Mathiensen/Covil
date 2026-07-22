@@ -55,6 +55,40 @@ class FakeAudioContext {
   resume = vi.fn(async () => undefined)
 }
 
+class TrackableMediaStream {
+  readonly id: string
+  private readonly tracks: MediaStreamTrack[]
+
+  constructor(tracks: MediaStreamTrack[] = [], id: string = crypto.randomUUID()) {
+    this.tracks = [...tracks]
+    this.id = id
+  }
+
+  addTrack(track: MediaStreamTrack) {
+    if (!this.tracks.some(({ id }) => id === track.id)) this.tracks.push(track)
+  }
+
+  removeTrack(track: MediaStreamTrack) {
+    const index = this.tracks.findIndex(({ id }) => id === track.id)
+    if (index >= 0) this.tracks.splice(index, 1)
+  }
+
+  getTracks() { return [...this.tracks] }
+  getAudioTracks() { return this.tracks.filter(({ kind }) => kind === 'audio') }
+  getVideoTracks() { return this.tracks.filter(({ kind }) => kind === 'video') }
+}
+
+function mediaTrack(id: string, kind: 'audio' | 'video') {
+  return {
+    addEventListener: vi.fn(),
+    enabled: true,
+    id,
+    kind,
+    onended: null,
+    stop: vi.fn(),
+  } as unknown as MediaStreamTrack
+}
+
 class NegotiationPeerConnection {
   static instances: NegotiationPeerConnection[] = []
   static failNextConstruction = false
@@ -112,11 +146,20 @@ class NegotiationPeerConnection {
   })
 }
 
-function VoiceHarness({ transport, enableSpeakingDetection = true }: { transport: SignalTransport; enableSpeakingDetection?: boolean }) {
+function VoiceHarness({
+  transport,
+  enableSpeakingDetection = true,
+  autoPlayRemoteAudio = true,
+}: {
+  transport: SignalTransport
+  enableSpeakingDetection?: boolean
+  autoPlayRemoteAudio?: boolean
+}) {
   const voice = useVoiceRoom({
     roomId: 'lobby',
     participant: { id: 'local-user', displayName: 'Jogador local' },
     transport,
+    autoPlayRemoteAudio,
     enableSpeakingDetection,
   })
 
@@ -129,6 +172,8 @@ function VoiceHarness({ transport, enableSpeakingDetection = true }: { transport
       <span aria-label="Mute efetivo">{String(voice.isMuted)}</span>
       <span aria-label="Mute do servidor">{String(voice.isServerMuted)}</span>
       <span aria-label="Peers remotos">{voice.remotePeers.length}</span>
+      <span aria-label="Áudios de voz remotos">{voice.remotePeers[0]?.audioStream.getAudioTracks().length ?? 0}</span>
+      <span aria-label="Áudios de tela remotos">{voice.remotePeers[0]?.screenStream?.getAudioTracks().length ?? 0}</span>
       <button onClick={() => void voice.join()} type="button">Entrar</button>
       <button onClick={() => void voice.startScreenShare()} type="button">Compartilhar tela</button>
       <button onClick={voice.toggleMute} type="button">Alternar mute</button>
@@ -238,6 +283,43 @@ describe('useVoiceRoom', () => {
         }),
       )
     })
+  })
+
+  it('mantém o áudio compartilhado junto da transmissão de tela', async () => {
+    NegotiationPeerConnection.instances = []
+    vi.stubGlobal('MediaStream', TrackableMediaStream)
+    vi.stubGlobal('RTCPeerConnection', NegotiationPeerConnection)
+    const microphone = new TrackableMediaStream([mediaTrack('microphone', 'audio')], 'microphone-stream')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn(async () => microphone),
+        getDisplayMedia: vi.fn(),
+      },
+    })
+    const friend = { id: 'friend-1', displayName: 'Jogador 1' }
+    const transport: SignalTransport = {
+      subscribe: vi.fn(() => () => undefined),
+      send: vi.fn(),
+      presence: vi.fn(({ participant, onChange }) => {
+        onChange([participant, friend])
+        return () => undefined
+      }),
+    }
+
+    render(<VoiceHarness autoPlayRemoteAudio={false} enableSpeakingDetection={false} transport={transport} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByText('joined')).toBeInTheDocument()
+
+    const peer = NegotiationPeerConnection.instances[0]
+    const screenAudio = mediaTrack('screen-audio', 'audio')
+    const screenVideo = mediaTrack('screen-video', 'video')
+    const sharedSource = new TrackableMediaStream([screenAudio, screenVideo], 'shared-screen')
+    peer.ontrack?.({ track: screenAudio, streams: [sharedSource] } as unknown as RTCTrackEvent)
+    peer.ontrack?.({ track: screenVideo, streams: [sharedSource] } as unknown as RTCTrackEvent)
+
+    await waitFor(() => expect(screen.getByLabelText('Áudios de tela remotos')).toHaveTextContent('1'))
+    expect(screen.getByLabelText('Áudios de voz remotos')).toHaveTextContent('0')
   })
 
   it('publica quando o participante local está falando', async () => {

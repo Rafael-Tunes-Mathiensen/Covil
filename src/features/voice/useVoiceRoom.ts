@@ -55,6 +55,7 @@ interface PeerContext {
   connection: RTCPeerConnection
   audioStream: MediaStream
   screenStream: MediaStream
+  screenSourceStreamIds: Set<string>
   audioElement: HTMLAudioElement | null
   polite: boolean
   makingOffer: boolean
@@ -693,6 +694,7 @@ function createPeer(session: ActiveSession, participantId: string) {
     connection,
     audioStream: new MediaStream(),
     screenStream: new MediaStream(),
+    screenSourceStreamIds: new Set(),
     audioElement: null,
     polite: isPolitePeer(session.localParticipant.id, participantId),
     makingOffer: false,
@@ -747,9 +749,28 @@ function createPeer(session: ActiveSession, participantId: string) {
     }
   }
 
-  connection.ontrack = ({ track }) => {
-    const targetStream =
-      track.kind === 'video' ? peer.screenStream : peer.audioStream
+  connection.ontrack = ({ track, streams }) => {
+    const sourceStreams = [...streams]
+    const belongsToScreen =
+      track.kind === 'video' ||
+      sourceStreams.some((stream) => (
+        peer.screenSourceStreamIds.has(stream.id) || stream.getVideoTracks().length > 0
+      ))
+
+    if (belongsToScreen) {
+      for (const sourceStream of sourceStreams) {
+        peer.screenSourceStreamIds.add(sourceStream.id)
+        for (const audioTrack of sourceStream.getAudioTracks()) {
+          const voiceTrack = peer.audioStream.getAudioTracks().find(({ id }) => id === audioTrack.id)
+          if (voiceTrack) peer.audioStream.removeTrack(voiceTrack)
+          if (!peer.screenStream.getTracks().some(({ id }) => id === audioTrack.id)) {
+            peer.screenStream.addTrack(audioTrack)
+          }
+        }
+      }
+    }
+
+    const targetStream = belongsToScreen ? peer.screenStream : peer.audioStream
 
     if (!targetStream.getTracks().some(({ id }) => id === track.id)) {
       targetStream.addTrack(track)
@@ -758,8 +779,11 @@ function createPeer(session: ActiveSession, participantId: string) {
     track.addEventListener(
       'ended',
       () => {
-        targetStream.removeTrack(track)
-        if (track.kind === 'audio' && targetStream.getAudioTracks().length === 0) {
+        for (const stream of [peer.audioStream, peer.screenStream]) {
+          const currentTrack = stream.getTracks().find(({ id }) => id === track.id)
+          if (currentTrack) stream.removeTrack(currentTrack)
+        }
+        if (track.kind === 'audio' && peer.audioStream.getAudioTracks().length === 0) {
           removeSpeakingMonitor(session, participantId)
         }
         session.publishPeers()
@@ -767,7 +791,7 @@ function createPeer(session: ActiveSession, participantId: string) {
       { once: true },
     )
 
-    if (track.kind === 'audio') {
+    if (track.kind === 'audio' && !belongsToScreen) {
       addSpeakingMonitor(session, participantId, peer.audioStream)
       void playRemoteAudio(session, peer)
     }
@@ -851,6 +875,7 @@ async function processSignal(
 
   if (signal.type === 'screen-share-state') {
     if (!signal.active) {
+      peer.screenSourceStreamIds.clear()
       for (const track of peer.screenStream.getTracks()) {
         peer.screenStream.removeTrack(track)
       }

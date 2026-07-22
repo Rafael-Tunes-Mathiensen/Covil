@@ -58,6 +58,7 @@ function renderChat(overrides: Partial<React.ComponentProps<typeof ChatPanel>> =
     onEdit: vi.fn(async () => undefined),
     onCreatePoll: vi.fn(async () => undefined),
     onSend: vi.fn(async () => undefined),
+    onSendCommandResult: vi.fn(async () => undefined),
     onToggleMembers: vi.fn(),
     onVotePoll: vi.fn(async () => undefined),
     roles,
@@ -104,6 +105,21 @@ describe('ChatPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Excluir mensagem' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão da mensagem' }))
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith('own-message'))
+  })
+
+  it('não oferece edição para resultados gerados por comandos', () => {
+    const commandMessage = {
+      ...messages[1],
+      id: 'dice-result',
+      content: '🎲 Dado de 1 a 20: 17',
+      kind: 'command',
+      command: 'dice',
+    } as unknown as ChatMessage
+
+    renderChat({ messages: [commandMessage] })
+
+    expect(screen.queryByRole('button', { name: 'Editar mensagem' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Excluir mensagem' })).toBeInTheDocument()
   })
 
   it('abre os comandos com barra e publica uma votação', async () => {

@@ -1223,6 +1223,22 @@ textarea:focus-visible {
   font-size: 9px;
 }
 
+.message__command-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 5px;
+  border: 1px solid rgb(255 112 67 / 18%);
+  border-radius: 5px;
+  color: color-mix(in srgb, var(--accent) 78%, #fff);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+  background: rgb(255 112 67 / 7%);
+}
+
 .message__actions {
   position: absolute;
   z-index: 2;
@@ -3370,6 +3386,14 @@ button.voice-error {
 .voice-person__profile { display: contents; color: inherit; }
 .screen-layout { display: grid; min-height: 0; height: 100%; grid-template-columns: minmax(0, 1fr) 230px; gap: 10px; padding: 10px; }
 .screen-layout.is-people-focused { grid-template-columns: minmax(300px, .8fr) minmax(360px, 1.2fr); }
+.screen-watch-prompt { display: grid; min-height: 0; height: 100%; grid-template-rows: auto minmax(0, 1fr); }
+.screen-watch-prompt__notice { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, rgb(255 112 67 / 8%), transparent 55%); }
+.screen-watch-prompt__notice > span { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(255 112 67 / 18%); border-radius: 10px; color: var(--accent); background: rgb(255 112 67 / 8%); }
+.screen-watch-prompt__notice > div { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.screen-watch-prompt__notice strong { color: var(--text); font-size: 11px; }
+.screen-watch-prompt__notice small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.screen-watch-prompt__notice .primary-button { flex: 0 0 auto; }
+.screen-watch-prompt > .voice-grid { min-height: 0; }
 .screen-layout__people { min-width: 0; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #0e1218; }
 .screen-layout__people .voice-grid { padding: 14px 10px; }
 .screen-layout__people .voice-grid__people { grid-template-columns: 1fr; gap: 8px; }

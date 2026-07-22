@@ -73,7 +73,7 @@ habilitar confirmação de e-mail.
 | `covil_roles` | Cargos com cor e permissões | Membros leem; só o owner cria, edita ou exclui |
 | `covil_member_roles` | Atribuições acumuláveis de cargos | Membros leem; só o owner atribui ou remove |
 | `voice_moderation_states` | Mute persistente e pedidos de desconexão por sala | Membros leem; escrita somente pela RPC autorizada |
-| `messages` | Texto e votações nos canais | Membros leem; cada autor escreve, edita ou exclui as próprias |
+| `messages` | Texto, votações e resultados de comandos | Membros leem; autor exclui as próprias e edita somente texto comum |
 | `poll_votes` | Um voto atual por pessoa e votação | Membros do canal leem; escrita somente pelas RPCs validadas |
 
 Ao cadastrar um usuário, o trigger `private.handle_new_user()` cria o perfil. A
@@ -270,13 +270,28 @@ um canal de voz também são rejeitadas.
 ### Editar ou excluir uma mensagem própria
 
 O cliente envia somente o novo conteúdo ou o identificador. A policy confirma
-novamente que `author_id = auth.uid()`; nem o owner pode alterar o texto escrito
-por outra pessoa:
+novamente que `author_id = auth.uid()` e `kind = 'text'`; nem o owner pode alterar
+o texto escrito por outra pessoa, e votações ou resultados de comandos não podem
+ser editados. O autor ainda pode excluir qualquer uma de suas mensagens:
 
 ```ts
 await supabase.from('messages').update({ content }).eq('id', messageId)
 await supabase.from('messages').delete().eq('id', messageId)
 ```
+
+### Publicar um resultado de dado ou roleta
+
+```ts
+await supabase.rpc('create_covil_command_result', {
+  p_channel_id: channelId,
+  p_command: 'dice',
+  p_content: '🎲 Dado de 1 a 20: 17',
+})
+```
+
+A RPC valida a associação ao canal, o tipo do comando e o formato do resultado,
+e grava `kind = 'command'`. A interface omite a ação de editar e a RLS bloqueia
+o update mesmo que alguém tente chamar a Data API diretamente.
 
 ### Criar e votar em uma votação
 
@@ -372,7 +387,8 @@ para usuários autenticados que passam pelas policies acima.
 | Ler cargos e atribuições | Membro do mesmo Covil |
 | Criar/editar/excluir/atribuir cargo | Somente owner, pelas RPCs; máximo de 12 cargos acumuláveis; owner pode se autoatribuir |
 | Ler mensagem | Membro atual do canal/Covil |
-| Criar/editar/excluir mensagem | Autor autenticado e membro atual; canal deve ser de texto |
+| Criar/editar/excluir mensagem | Autor autenticado e membro atual; texto comum pode ser editado, comando/votação somente excluído |
+| Publicar resultado de dado/roleta | Membro do canal de texto, pela RPC validada; resultado fica imutável |
 | Criar/votar em votação | Membro atual do canal de texto, pelas RPCs; um voto atual por pessoa |
 | Observar ou anunciar Presence na voz | Membro autenticado do Covil; somente no tópico `voice-presence:<channel_uuid>` |
 | Publicar ou receber sinais WebRTC | Membro autenticado do Covil; somente no tópico `voice:<channel_uuid>` e enquanto assina a chamada |

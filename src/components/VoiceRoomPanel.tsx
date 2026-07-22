@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AudioLines,
+  Eye,
+  EyeOff,
   Headphones,
   Fullscreen,
   LoaderCircle,
@@ -63,9 +65,16 @@ export function VoiceRoomPanel({
   const [isScreenFocused, setIsScreenFocused] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState<string | null>(null)
+  const [watchedRemoteShareKey, setWatchedRemoteShareKey] = useState<string | null>(null)
   const screenStageRef = useRef<HTMLDivElement>(null)
   const remoteShare = voice.remotePeers.find(({ screenStream }) => screenStream)
-  const screenStream = remoteShare?.screenStream ?? voice.localScreenStream
+  const remoteShareKey = remoteShare?.screenStream
+    ? `${remoteShare.participant.id}:${remoteShare.screenStream.id ?? 'screen'}`
+    : null
+  const isWatchingRemoteShare = Boolean(remoteShareKey && watchedRemoteShareKey === remoteShareKey)
+  const screenStream = remoteShare
+    ? isWatchingRemoteShare ? remoteShare.screenStream : null
+    : voice.localScreenStream
   const sharer = remoteShare?.participant.displayName ?? currentUser.displayName
   const isTransitioning = voice.status === 'joining' || voice.status === 'leaving'
   const profiles = useMemo(() => new Map(members.map((member) => [member.id, member])), [members])
@@ -112,6 +121,13 @@ export function VoiceRoomPanel({
     } catch {
       setFullscreenError('O navegador bloqueou a tela cheia. Tente novamente pelo botão da transmissão.')
     }
+  }
+
+  async function stopWatching() {
+    if (document.fullscreenElement === screenStageRef.current) {
+      await document.exitFullscreen().catch(() => undefined)
+    }
+    setWatchedRemoteShareKey(null)
   }
   const participantsGrid = (
     <div className="voice-grid">
@@ -178,7 +194,26 @@ export function VoiceRoomPanel({
         </div>
       </header>
 
-      {screenStream ? (
+      {remoteShare && !isWatchingRemoteShare ? (
+        <div className="screen-watch-prompt">
+          <div className="screen-watch-prompt__notice">
+            <span><MonitorUp size={22} /></span>
+            <div>
+              <strong>{sharer} começou uma transmissão</strong>
+              <small>O vídeo e o áudio só começam quando você decidir assistir.</small>
+            </div>
+            <button
+              aria-label={`Assistir transmissão de ${sharer}`}
+              className="primary-button primary-button--compact"
+              onClick={() => setWatchedRemoteShareKey(remoteShareKey)}
+              type="button"
+            >
+              <Eye size={17} /> Assistir transmissão
+            </button>
+          </div>
+          {participantsGrid}
+        </div>
+      ) : screenStream ? (
         <div className={`screen-layout${isScreenFocused ? ' is-screen-focused' : ' is-people-focused'}`}>
           <div className="screen-stage" ref={screenStageRef}>
             <div className="screen-stage__meta">
@@ -192,6 +227,11 @@ export function VoiceRoomPanel({
                   {isFullscreen ? <Minimize2 size={16} /> : <Fullscreen size={16} />}
                   {isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
                 </button>
+                {remoteShare && (
+                  <button aria-label="Parar de assistir" onClick={() => void stopWatching()} type="button">
+                    <EyeOff size={16} /> Parar de assistir
+                  </button>
+                )}
               </div>
             </div>
             <StreamVideo label={`Tela compartilhada por ${sharer}`} muted={!remoteShare} stream={screenStream} />

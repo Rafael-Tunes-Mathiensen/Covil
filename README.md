@@ -5,7 +5,7 @@
   <p>Um espaço privado de voz, mensagens e compartilhamento de tela para grupos pequenos.</p>
 
   [![Qualidade](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml)
-  ![Versão](https://img.shields.io/badge/versão-0.2.1-ff7043)
+  ![Versão](https://img.shields.io/badge/versão-0.2.2-ff7043)
   ![Licença](https://img.shields.io/badge/licença-MIT-929aa8)
 </div>
 
@@ -21,12 +21,12 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - cadastro e login por e-mail com Supabase Auth;
 - criação de múltiplos Covils exclusiva da conta proprietária, capacidade de 1 a 6 membros e entrada por convite de uso único;
 - seletor lateral para alternar entre todos os Covils dos quais a pessoa participa;
-- mensagens em tempo real com menções notificadas, edição, exclusão, votações, roleta e dado;
+- mensagens em tempo real com menções notificadas, edição, exclusão, votações e resultados imutáveis de roleta e dado;
 - perfis com nome, foto, descrição e troca de senha, visíveis apenas entre membros do mesmo Covil;
 - canais de texto e salas de voz criados e reordenados por arrastar pelo owner ou por cargos autorizados, até o limite de 25 canais;
 - chamadas mesh para até seis participantes, com ocupantes visíveis por sala e inspeção sem abandonar a chamada atual;
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
-- compartilhamento de tela em 720p/30 fps, áudio quando permitido pelo navegador, foco alternável sem esconder os participantes e tela cheia nativa;
+- compartilhamento de tela em 720p/30 fps iniciado sob escolha de cada espectador, com opção de parar de assistir, áudio quando fornecido pelo navegador, foco alternável e tela cheia nativa;
 - chamada com dock arrastável, posição persistente e modo compacto, além de moderação disponível tanto na sala quanto no painel lateral;
 - até 12 cargos acumuláveis e editáveis, inclusive cargos apenas visuais e autoatribuição pelo owner, com permissões opcionais para criar canais, moderar voz, remover membros ou gerenciar configurações gerais;
 - nome do Covil clicável para owner e cargos autorizados, com renomeação sincronizada em tempo real;
@@ -84,7 +84,7 @@ flowchart LR
     P["Sites · Cloudflare Workers"] -->|"Entrega a PWA"| A & B & C
 ```
 
-Áudio e vídeo não passam pelo banco. Cada navegador envia sua mídia diretamente aos outros participantes. A configuração padrão usa somente STUN, que ajuda a descobrir rotas diretas, mas não retransmite mídia. Por isso, chat e lista de ocupantes podem funcionar enquanto áudio ou tela falham em redes com CGNAT, NAT simétrico ou firewall; nesses casos é necessário configurar TURN com credenciais efêmeras. No compartilhamento, o áudio depende de escolher uma aba ou janela compatível e marcar **Compartilhar áudio** na janela do navegador.
+Áudio e vídeo não passam pelo banco. Cada navegador envia sua mídia diretamente aos outros participantes. A configuração padrão usa somente STUN, que ajuda a descobrir rotas diretas, mas não retransmite mídia. Por isso, chat e lista de ocupantes podem funcionar enquanto áudio ou tela falham em redes com CGNAT, NAT simétrico ou firewall; nesses casos é necessário configurar TURN com credenciais efêmeras. No compartilhamento, cada espectador escolhe quando começar ou parar de assistir; a faixa de áudio acompanha a tela e depende de escolher uma aba compatível e marcar **Compartilhar áudio** na janela do navegador.
 
 Leia a [arquitetura completa](docs/ARCHITECTURE.md) para conhecer as fronteiras e decisões do MVP.
 

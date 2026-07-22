@@ -11,6 +11,7 @@
 - **Permissão**: capacidade operacional autorizada pelo banco. É opcional em um cargo e pode conceder `manage_channels`, `moderate_voice`, `remove_members` ou `manage_covil`.
 - **Canal de texto**: espaço persistente para mensagens.
 - **Canal de voz**: sala WebRTC independente para voz e compartilhamento de tela.
+- **Transmissão assistida**: tela remota cujo vídeo e áudio só são reproduzidos depois que cada espectador escolhe assistir.
 - **Sala observada**: canal de voz aberto na área principal apenas para consultar seus ocupantes, sem alterar a chamada ativa.
 - **Moderação de voz**: comando autorizado e persistido pelo servidor para que o cliente oficial imponha silêncio, libere a restrição ou desconecte um participante da sala.
 
@@ -27,5 +28,7 @@
 - Nenhum cargo pode remover, silenciar ou desconectar o Fundador.
 - Um silêncio imposto nunca liga o microfone de alguém. A ação de liberar apenas devolve ao participante o controle do próprio microfone.
 - Selecionar uma sala apenas a observa. Somente a ação de entrar nela encerra a sessão WebRTC anterior e inicia a nova chamada.
+- Resultados gerados por `/dado` e `/roleta` podem ser excluídos pelo autor, mas nunca editados; o resultado publicado permanece autêntico.
+- Receber uma transmissão não inicia sua reprodução. Cada espectador pode assistir ou parar de assistir sem sair da chamada, e o áudio compartilhado acompanha essa escolha.
 - A interface pode ocultar controles sem permissão, mas toda ação sensível também é validada pelo banco.
 - Em uma malha WebRTC entre navegadores, a moderação é aplicada de forma cooperativa pelos clientes oficiais. Garantia contra clientes modificados exigiria um servidor de mídia dedicado.
