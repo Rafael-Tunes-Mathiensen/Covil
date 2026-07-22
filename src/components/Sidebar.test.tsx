@@ -99,6 +99,29 @@ describe('Sidebar', () => {
     expect(onReorderChannels).toHaveBeenCalledWith('text', ['codigos', 'geral'])
   })
 
+  it('oferece a edição de nome para canais de texto e voz quando autorizado', () => {
+    const onRenameChannel = vi.fn()
+    render(
+      <Sidebar
+        canManageChannels
+        channels={channels}
+        covil={covil}
+        currentChannelId="geral"
+        currentUser={currentUser}
+        onRenameChannel={onRenameChannel}
+        onSelectChannel={vi.fn()}
+        voiceChannelId={null}
+        voiceStatus="idle"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar nome do canal geral' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar nome da sala Lobby' }))
+
+    expect(onRenameChannel).toHaveBeenNthCalledWith(1, channels[0])
+    expect(onRenameChannel).toHaveBeenNthCalledWith(2, channels[2])
+  })
+
   it('lista e alterna entre os Covils do membro', () => {
     const onSwitchCovil = vi.fn(async () => undefined)
     render(

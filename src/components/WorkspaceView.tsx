@@ -26,6 +26,7 @@ import { CovilSettingsDialog } from './CovilSettingsDialog'
 import { CreateChannelDialog } from './CreateChannelDialog'
 import { MembersPanel } from './MembersPanel'
 import { ProfileDialog } from './ProfileDialog'
+import { RenameChannelDialog } from './RenameChannelDialog'
 import { Sidebar } from './Sidebar'
 import { VoiceDock } from './VoiceDock'
 import { VoiceRoomPanel } from './VoiceRoomPanel'
@@ -64,6 +65,7 @@ interface WorkspaceViewProps {
   voiceModerationStates?: readonly VoiceModerationState[]
   isSubmitting?: boolean
   onCreateChannel?: (name: string, kind: ChannelKind) => Promise<unknown>
+  onRenameChannel?: (channelId: string, name: string) => Promise<unknown>
   onReorderChannels?: (kind: ChannelKind, channelIds: string[]) => Promise<unknown>
   onCreateRole?: (name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
   onUpdateRole?: (roleId: string, name: string, color: string, permissions: CovilPermission[]) => Promise<unknown>
@@ -116,6 +118,7 @@ export function WorkspaceView({
   voiceModerationStates = [],
   isSubmitting = false,
   onCreateChannel,
+  onRenameChannel,
   onReorderChannels,
   onCreateRole,
   onUpdateRole,
@@ -139,6 +142,7 @@ export function WorkspaceView({
   const [showAdmin, setShowAdmin] = useState(false)
   const [showCovilSettings, setShowCovilSettings] = useState(false)
   const [createChannelKind, setCreateChannelKind] = useState<ChannelKind | null>(null)
+  const [channelToRename, setChannelToRename] = useState<Channel | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const sounds = useSoundEffects(ultraEconomy)
   const previousMessageRef = useRef<{ channelId: string; messageIds: Set<string> } | null>(null)
@@ -221,6 +225,7 @@ export function WorkspaceView({
         canManageChannels={canManageChannels}
         canManageCovil={canOpenCovilSettings}
         onCreateChannel={onCreateChannel ? setCreateChannelKind : undefined}
+        onRenameChannel={onRenameChannel ? setChannelToRename : undefined}
         onReorderChannels={onReorderChannels}
         onOpenCovilSettings={() => setShowCovilSettings(true)}
         onCreateCovil={onCreateCovil}
@@ -321,6 +326,14 @@ export function WorkspaceView({
           kind={createChannelKind}
           onClose={() => setCreateChannelKind(null)}
           onCreate={onCreateChannel}
+        />
+      )}
+      {channelToRename && onRenameChannel && (
+        <RenameChannelDialog
+          channel={channelToRename}
+          isSubmitting={isSubmitting}
+          onClose={() => setChannelToRename(null)}
+          onRename={onRenameChannel}
         />
       )}
       {showCovilSettings && onCreateRole && onUpdateRole && onDeleteRole && onSetMemberRole && onRemoveMember && onUpdateCovilName && (

@@ -415,6 +415,22 @@ describe('useCovilWorkspace', () => {
     })
   })
 
+  it('renomeia um canal pelo RPC autorizado', async () => {
+    const fake = createFakeClient({
+      currentRole: 'owner',
+      channels: [{ id: 'geral', covil_id: covilId, name: 'geral', kind: 'text', position: 0 }],
+    })
+    const { result } = renderHook(() => useCovilWorkspace(fake.client, user))
+
+    await waitFor(() => expect(result.current.channels).toHaveLength(1))
+    await act(() => result.current.renameChannel('geral', '  bate-papo  '))
+
+    expect(fake.rpc).toHaveBeenCalledWith('rename_covil_channel', {
+      p_channel_id: 'geral',
+      p_name: 'bate-papo',
+    })
+  })
+
   it('persiste a nova ordem dos canais pelo RPC autorizado', async () => {
     const fake = createFakeClient({
       currentRole: 'owner',

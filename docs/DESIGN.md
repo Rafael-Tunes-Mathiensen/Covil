@@ -17,7 +17,7 @@ Uma central de comunicação noturna, compacta e acolhedora, construída com sup
 - A entrada no aplicativo revela a estrutura por camadas, da navegação ao conteúdo.
 - Selecionar uma sala de voz permite inspecionar seus ocupantes sem interromper a chamada mantida no dock; entrar nela é uma ação explícita.
 - O dock da chamada pode ser arrastado dentro da área principal e reduzido a um único controle compacto; posição e estado minimizado permanecem no dispositivo.
-- Quem possui `manage_channels` pode arrastar canais dentro da seção de texto ou voz; realce e opacidade indicam origem e destino sem acrescentar controles permanentes.
+- Quem possui `manage_channels` pode arrastar canais dentro da seção de texto ou voz e usar o lápis discreto para renomeá-los; realce, opacidade e foco indicam a ação sem poluir a navegação.
 - O contorno do avatar e uma pequena forma de onda entre a foto e o nome respondem somente enquanto o detector local identifica fala.
 - O compartilhamento de tela primeiro exibe um convite discreto; cada espectador decide assistir ou parar. Enquanto assiste, a tela expande a área principal, mantém participantes e moderação em uma coluna e permite alternar foco ou usar tela cheia nativa.
 - Mensagens, participantes, diálogos, abas e cargos entram com deslocamentos curtos e opacidade.

@@ -5,7 +5,7 @@
   <p>Um espaço privado de voz, mensagens e compartilhamento de tela para grupos pequenos.</p>
 
   [![Qualidade](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-Tunes-Mathiensen/Covil/actions/workflows/ci.yml)
-  ![Versão](https://img.shields.io/badge/versão-0.2.2-ff7043)
+  ![Versão](https://img.shields.io/badge/versão-0.2.3-ff7043)
   ![Licença](https://img.shields.io/badge/licença-MIT-929aa8)
 </div>
 
@@ -23,7 +23,7 @@ O projeto abre em **modo de demonstração** quando não encontra credenciais do
 - seletor lateral para alternar entre todos os Covils dos quais a pessoa participa;
 - mensagens em tempo real com menções notificadas, edição, exclusão, votações e resultados imutáveis de roleta e dado;
 - perfis com nome, foto, descrição e troca de senha, visíveis apenas entre membros do mesmo Covil;
-- canais de texto e salas de voz criados e reordenados por arrastar pelo owner ou por cargos autorizados, até o limite de 25 canais;
+- canais de texto e salas de voz criados, renomeados e reordenados por arrastar pelo owner ou por cargos autorizados, até o limite de 25 canais;
 - chamadas mesh para até seis participantes, com ocupantes visíveis por sala e inspeção sem abandonar a chamada atual;
 - indicador local de quem está falando, mute, limpeza de mídia, ICE restart e recriação automática de peers;
 - compartilhamento de tela em 720p/30 fps iniciado sob escolha de cada espectador, com opção de parar de assistir, áudio quando fornecido pelo navegador, foco alternável e tela cheia nativa;

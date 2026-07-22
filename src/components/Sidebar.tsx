@@ -5,6 +5,7 @@ import {
   Headphones,
   GripVertical,
   LogOut,
+  Pencil,
   Plus,
   RefreshCw,
   Settings,
@@ -37,6 +38,7 @@ interface SidebarProps {
   canManageChannels?: boolean
   canManageCovil?: boolean
   onCreateChannel?: (kind: ChannelKind) => void
+  onRenameChannel?: (channel: Channel) => void
   onReorderChannels?: (kind: ChannelKind, channelIds: string[]) => void | Promise<unknown>
   onOpenCovilSettings?: () => void
   onCreateCovil?: (name: string, memberLimit: number) => Promise<void>
@@ -69,6 +71,7 @@ export function Sidebar({
   canManageChannels = false,
   canManageCovil = false,
   onCreateChannel,
+  onRenameChannel,
   onReorderChannels,
   onOpenCovilSettings,
   onCreateCovil,
@@ -90,6 +93,7 @@ export function Sidebar({
   const textChannels = channels.filter(({ kind }) => kind === 'text')
   const voiceChannels = channels.filter(({ kind }) => kind === 'voice')
   const canReorderChannels = canManageChannels && Boolean(onReorderChannels)
+  const canRenameChannels = canManageChannels && Boolean(onRenameChannel)
   const canOpenCovilSettings = canManageCovil && Boolean(onOpenCovilSettings)
 
   function startChannelDrag(event: DragEvent<HTMLButtonElement>, channel: Channel) {
@@ -187,22 +191,34 @@ export function Sidebar({
           title="Texto"
         >
           {textChannels.map((channel) => (
-            <button
-              className={`channel${currentChannelId === channel.id ? ' is-active' : ''}${channelDragClass(channel)}`}
-              key={channel.id}
-              aria-label={`Canal de texto ${channel.name}`}
-              draggable={canReorderChannels}
-              onDragEnd={finishChannelDrag}
-              onDragOver={(event) => dragOverChannel(event, channel)}
-              onDragStart={(event) => startChannelDrag(event, channel)}
-              onDrop={(event) => dropChannel(event, channel)}
-              onClick={() => onSelectChannel(channel)}
-              title={canReorderChannels ? 'Arraste para reordenar' : undefined}
-              type="button"
-            >
-              <Hash size={18} /><span>{channel.name}</span>
-              {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
-            </button>
+            <div className={`channel-row${canRenameChannels ? ' has-edit' : ''}`} key={channel.id}>
+              <button
+                className={`channel${currentChannelId === channel.id ? ' is-active' : ''}${channelDragClass(channel)}`}
+                aria-label={`Canal de texto ${channel.name}`}
+                draggable={canReorderChannels}
+                onDragEnd={finishChannelDrag}
+                onDragOver={(event) => dragOverChannel(event, channel)}
+                onDragStart={(event) => startChannelDrag(event, channel)}
+                onDrop={(event) => dropChannel(event, channel)}
+                onClick={() => onSelectChannel(channel)}
+                title={canReorderChannels ? 'Arraste para reordenar' : undefined}
+                type="button"
+              >
+                <Hash size={18} /><span>{channel.name}</span>
+                {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
+              </button>
+              {canRenameChannels && onRenameChannel && (
+                <button
+                  aria-label={`Editar nome do canal ${channel.name}`}
+                  className="channel-row__edit"
+                  onClick={() => onRenameChannel(channel)}
+                  title="Editar nome"
+                  type="button"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
+            </div>
           ))}
         </ChannelSection>
 
@@ -216,26 +232,39 @@ export function Sidebar({
             const participants = voicePresenceByChannel.get(channel.id) ?? []
             return (
               <div className="voice-channel-entry" key={channel.id}>
-                <button
-                  className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}${channelDragClass(channel)}`}
-                  aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
-                  draggable={canReorderChannels}
-                  onDragEnd={finishChannelDrag}
-                  onDragOver={(event) => dragOverChannel(event, channel)}
-                  onDragStart={(event) => startChannelDrag(event, channel)}
-                  onDrop={(event) => dropChannel(event, channel)}
-                  onClick={() => onSelectChannel(channel)}
-                  title={canReorderChannels ? 'Arraste para reordenar' : undefined}
-                  type="button"
-                >
-                  {isConnected ? <Headphones size={18} /> : <Volume2 size={18} />}
-                  <span>{channel.name}</span>
-                  {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
-                  {participants.length > 0 && (
-                    <small className="channel__count">{participants.length}</small>
+                <div className={`channel-row${canRenameChannels ? ' has-edit' : ''}`}>
+                  <button
+                    className={`channel channel--voice${currentChannelId === channel.id ? ' is-active' : ''}${isConnected ? ' is-connected' : ''}${channelDragClass(channel)}`}
+                    aria-label={`Sala de voz ${channel.name}${isConnected ? ', conectada' : ''}`}
+                    draggable={canReorderChannels}
+                    onDragEnd={finishChannelDrag}
+                    onDragOver={(event) => dragOverChannel(event, channel)}
+                    onDragStart={(event) => startChannelDrag(event, channel)}
+                    onDrop={(event) => dropChannel(event, channel)}
+                    onClick={() => onSelectChannel(channel)}
+                    title={canReorderChannels ? 'Arraste para reordenar' : undefined}
+                    type="button"
+                  >
+                    {isConnected ? <Headphones size={18} /> : <Volume2 size={18} />}
+                    <span>{channel.name}</span>
+                    {canReorderChannels && <GripVertical className="channel__drag-grip" size={14} />}
+                    {participants.length > 0 && (
+                      <small className="channel__count">{participants.length}</small>
+                    )}
+                    {isConnected && <i className="channel__live" />}
+                  </button>
+                  {canRenameChannels && onRenameChannel && (
+                    <button
+                      aria-label={`Editar nome da sala ${channel.name}`}
+                      className="channel-row__edit"
+                      onClick={() => onRenameChannel(channel)}
+                      title="Editar nome"
+                      type="button"
+                    >
+                      <Pencil size={13} />
+                    </button>
                   )}
-                  {isConnected && <i className="channel__live" />}
-                </button>
+                </div>
                 {participants.length > 0 && (
                   <div
                     aria-label={`Participantes em ${channel.name}`}

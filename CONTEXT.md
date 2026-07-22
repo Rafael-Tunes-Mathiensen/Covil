@@ -25,6 +25,7 @@
 - As permissões efetivas de um membro são a união das permissões de todos os cargos atribuídos a ele.
 - Um cargo sem permissões continua válido e visível ao lado do nome do membro.
 - `manage_covil` permite alterar configurações gerais, como o nome, mas não transfere a propriedade nem permite administrar cargos.
+- `manage_channels` permite criar, renomear e reordenar canais de texto e voz, sem alterar seu tipo ou o Covil ao qual pertencem.
 - Nenhum cargo pode remover, silenciar ou desconectar o Fundador.
 - Um silêncio imposto nunca liga o microfone de alguém. A ação de liberar apenas devolve ao participante o controle do próprio microfone.
 - Selecionar uma sala apenas a observa. Somente a ação de entrar nela encerra a sessão WebRTC anterior e inicia a nova chamada.

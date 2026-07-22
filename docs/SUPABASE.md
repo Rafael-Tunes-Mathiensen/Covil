@@ -137,6 +137,16 @@ const { data: channelId, error } = await supabase.rpc('create_covil_channel', {
 })
 ```
 
+O mesmo grupo autorizado renomeia canais pela RPC, que preserva tipo e posição,
+normaliza o nome e rejeita duplicatas do mesmo tipo:
+
+```ts
+await supabase.rpc('rename_covil_channel', {
+  p_channel_id: channelId,
+  p_name: 'bate-papo',
+})
+```
+
 A mesma permissão pode persistir uma nova ordem dentro de uma seção. A RPC exige
 todos os IDs daquele tipo exatamente uma vez, impedindo mover ou omitir canais
 de outro Covil:
@@ -382,6 +392,7 @@ para usuários autenticados que passam pelas policies acima.
 | Excluir Covil | Somente owner |
 | Sair/remover membro | Pela RPC: própria saída ou `remove_members`; fundador e app owner são protegidos |
 | Criar canal | Pela RPC: owner ou cargo com `manage_channels`; máximo de 25 por Covil |
+| Renomear canal | Pela RPC: owner ou cargo com `manage_channels`; nome único por tipo, de 1 a 40 caracteres |
 | Reordenar canais | Pela RPC: owner ou cargo com `manage_channels`; lista completa, sem IDs repetidos ou externos |
 | Editar/excluir canal | Owner do Covil |
 | Ler cargos e atribuições | Membro do mesmo Covil |
